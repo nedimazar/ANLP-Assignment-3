@@ -76,10 +76,18 @@ def expand_to_wordpieces(original_sentence: List, tokenizer: BertTokenizer, orig
 
 def data_to_tensors(dataset: List, tokenizer: BertTokenizer, max_len: int, labels: List=None, label2index: Dict=None, pad_token_label_id: int=-100) -> Tuple:
     tokenized_sentences, label_indices = [], []
+    problems = set()
     for i, sentence in enumerate(dataset):
         # Get WordPiece Indices
         if labels and label2index:
-            wordpieces, labelset = expand_to_wordpieces(sentence, tokenizer, labels[i])
+            try:
+                wordpieces, labelset = expand_to_wordpieces(sentence, tokenizer, labels[i])
+            except Exception as e:
+                if tuple(sentence) not in problems:
+                    print("Problem expanding: ", " ".join(sentence))
+                    problems.add(tuple(sentence))
+                continue
+
             label_indices.append([label2index.get(lbl, pad_token_label_id) for lbl in labelset])
         else:
              wordpieces, labelset = expand_to_wordpieces(sentence, tokenizer, None)
@@ -105,6 +113,7 @@ def data_to_tensors(dataset: List, tokenizer: BertTokenizer, max_len: int, label
         att_mask = [int(token_id > 0) for token_id in sent]
         # Store the attention mask for this sentence.
         attention_masks.append(att_mask)
+    print("Total fucked sentences:", len(problems))
     return LongTensor(input_ids), LongTensor(attention_masks), label_ids,  LongTensor(seq_lengths)
 
 
@@ -139,7 +148,19 @@ def read_json_srl(filename: str, delimiter: str='\t', has_labels: bool=True) -> 
             chunk = list()
         else:
             chunk.append(line)
-    return [get_json(chunk) for chunk in chunks]
+    chunked = [get_json(chunk) for chunk in chunks]
+    all_data = []
+    [all_data.extend(x) for x in chunked]
+
+    label_dict = {}
+    all_sentences = [instance['seq_words'] for instance in all_data]
+    labels = [instance['bio'] for instance in all_data]
+    all_preds = [instance['pred_sense'] for instance in all_data]
+
+    all_labels = []
+    [all_labels.extend(x) for x in labels]
+    label_dict = add_to_label_dict(all_labels, label_dict=label_dict)
+    return all_sentences, labels, label_dict, all_preds
 
 def get_json(chunk, delimiter='\t'):
     sentence = list()
