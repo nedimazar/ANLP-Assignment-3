@@ -1,21 +1,8 @@
-from typing import List, Dict, Tuple
-from torch.utils.data import DataLoader
-from transformers import BertTokenizer
-from tensorflow.keras.preprocessing.sequence import pad_sequences
-import torch
-import numpy as np
-import json, datetime, os
-from transformers.utils import logging
-import logging, re
-from seqeval.metrics import f1_score, precision_score, recall_score, classification_report
-from transformers.utils.dummy_pt_objects import BertModel
-from transformers import get_linear_schedule_with_warmup
 import datetime
 import json
 import logging
 import os
 import re
-import sys
 from typing import Dict, List, Tuple
 
 import numpy as np
@@ -23,9 +10,9 @@ import torch
 from keras.preprocessing.sequence import pad_sequences
 from seqeval.metrics import (classification_report, f1_score, precision_score,
                              recall_score)
+from tensorflow.keras.preprocessing.sequence import pad_sequences
 from torch.utils.data import DataLoader
-from transformers import BertTokenizer
-from transformers.utils import logging
+from transformers import BertTokenizer, get_linear_schedule_with_warmup
 from transformers.utils.dummy_pt_objects import BertModel
 
 logger = logging.getLogger(__name__)
