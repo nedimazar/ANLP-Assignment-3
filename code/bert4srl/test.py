@@ -125,11 +125,13 @@ def get_data(file_name):
 if __name__ == "__main__":
     tokenizer = BertTokenizer.from_pretrained(BERT_MODEL_NAME, do_basic_tokenize=False)
  
-    train_data, train_sampler, train_dataloader, index2label = get_data("/Users/jonas/Desktop/Dutsy/ANLP-Assignment-3/code/bert4srl/data/en_ewt-up-test.conllu")
+    train_data, train_sampler, train_dataloader, index2label = get_data("/Users/jonas/Desktop/Dutsy/ANLP-Assignment-3/code/bert4srl/data/en_ewt-up-train.conllu")
     
-    dev_data, dev_sampler, dev_dataloader, index2label = get_data("/Users/jonas/Desktop/Dutsy/ANLP-Assignment-3/code/bert4srl/data/en_ewt-up-test.conllu")
+    dev_data, dev_sampler, dev_dataloader, index2labeltest = get_data("/Users/jonas/Desktop/Dutsy/ANLP-Assignment-3/code/bert4srl/data/en_ewt-up-test.conllu")
 
-
+    print(len(index2label), len(index2labeltest))
+    print("Train Index labels", index2label)
+    print("Test Index labels", index2labeltest)
     model = BertForTokenClassification.from_pretrained(BERT_MODEL_NAME, num_labels=len(index2label))
     model.config.finetuning_task = 'token-classification'
     model.config.id2label = index2label
@@ -161,7 +163,7 @@ if __name__ == "__main__":
         model.train()
 
         # For each batch of training data...
-        for step, batch in enumerate(train_dataloader):
+        for step, batch in tqdm(enumerate(train_dataloader)):
             b_input_ids = batch[0].to(device)
             b_input_mask = batch[1].to(device)
             b_labels = batch[2].to(device)
