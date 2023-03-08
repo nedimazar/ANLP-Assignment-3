@@ -1,3 +1,15 @@
+from typing import List, Dict, Tuple
+from torch.utils.data import DataLoader
+from transformers import BertTokenizer
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+import torch
+import numpy as np
+import json, datetime, os
+from transformers.utils import logging
+import logging, re
+from seqeval.metrics import f1_score, precision_score, recall_score, classification_report
+from transformers.utils.dummy_pt_objects import BertModel
+from transformers import get_linear_schedule_with_warmup
 import datetime
 import json
 import logging
@@ -166,7 +178,7 @@ def read_json_srl(filename: str, delimiter: str='\t', has_labels: bool=True) -> 
     all_labels = []
     [all_labels.extend(x) for x in labels]
     label_dict = add_to_label_dict(all_labels, label_dict=label_dict)
-    return all_sentences, labels, label_dict, all_preds
+    return all_sentences, labels, label_dict, all_preds, chunked
 
 def get_json(chunk, delimiter='\t'):
     sentence = list()
@@ -175,6 +187,7 @@ def get_json(chunk, delimiter='\t'):
     
     for line in chunk:         
         tokens = line.split(delimiter)
+
         if "." not in tokens[0]:
             sentence.append(tokens[1])
             if len(tokens)>= 11 and tokens[10] != '_':
@@ -231,9 +244,8 @@ def evaluate_bert_model(eval_dataloader: DataLoader, eval_batch_size: int, model
     for batch in eval_dataloader:
         # Add batch to GPU
         batch = tuple(t.to(device) for t in batch)
-
         # Unpack the inputs from our dataloader
-        b_input_ids, b_input_mask, b_labels, b_len = batch
+        b_input_ids, b_input_mask, b_labels = batch
 
         with torch.no_grad():
             outputs = model(b_input_ids, attention_mask=b_input_mask, labels=b_labels)
