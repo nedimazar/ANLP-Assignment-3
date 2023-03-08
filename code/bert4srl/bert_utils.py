@@ -10,7 +10,23 @@ import logging, re
 from seqeval.metrics import f1_score, precision_score, recall_score, classification_report
 from transformers.utils.dummy_pt_objects import BertModel
 from transformers import get_linear_schedule_with_warmup
+import datetime
+import json
+import logging
+import os
+import re
+import sys
+from typing import Dict, List, Tuple
 
+import numpy as np
+import torch
+from keras.preprocessing.sequence import pad_sequences
+from seqeval.metrics import (classification_report, f1_score, precision_score,
+                             recall_score)
+from torch.utils.data import DataLoader
+from transformers import BertTokenizer
+from transformers.utils import logging
+from transformers.utils.dummy_pt_objects import BertModel
 
 logger = logging.getLogger(__name__)
 
@@ -171,13 +187,15 @@ def get_json(chunk, delimiter='\t'):
     
     for line in chunk:         
         tokens = line.split(delimiter)
-        sentence.append(tokens[1])
-        if len(tokens)>= 11 and tokens[10] != '_':
-            predicate_senses[pred_index]["pred_sense"] = [int(float(tokens[0])) -1, tokens[10]]
-            pred_index += 1
-        preds = tokens[11:]
-        for i, pred in enumerate(preds):
-            predicate_senses[i]['bio'].append(pred)
+
+        if "." not in tokens[0]:
+            sentence.append(tokens[1])
+            if len(tokens)>= 11 and tokens[10] != '_':
+                predicate_senses[pred_index]["pred_sense"] = [int(float(tokens[0])) -1, tokens[10]]
+                pred_index += 1
+            preds = tokens[11:]
+            for i, pred in enumerate(preds):
+                predicate_senses[i]['bio'].append(pred)
     for i in range(len(predicate_senses)):
         predicate_senses[i]["seq_words"] = sentence
         
