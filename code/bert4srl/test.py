@@ -1,18 +1,18 @@
-import bert_utils as util
 import json
-import numpy as np
-from typing import List
-from torch.utils.data import TensorDataset, DataLoader, RandomSampler
-from transformers import BertForTokenClassification, AdamW
-from transformers import get_linear_schedule_with_warmup
-import logging, sys
+import logging
+import sys
 import time
-from transformers import BertTokenizer
-from tqdm import tqdm
+from typing import List
+
+import bert_utils as util
+import numpy as np
 import torch
 from torch.nn import CrossEntropyLoss
-from transformers import pipeline
-from torch.utils.data import SequentialSampler
+from torch.utils.data import (DataLoader, RandomSampler, SequentialSampler,
+                              TensorDataset)
+from tqdm import tqdm
+from transformers import (AdamW, BertForTokenClassification, BertTokenizer,
+                          get_linear_schedule_with_warmup, pipeline)
 
 PAD_TOKEN_LABEL_ID = CrossEntropyLoss().ignore_index # -100
 
