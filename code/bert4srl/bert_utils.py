@@ -139,7 +139,7 @@ def add_to_label_dict(labels:List, label_dict: Dict) -> Dict:
     return label_dict
 
 def read_json_srl(filename: str, delimiter: str='\t', has_labels: bool=True) -> Tuple[List, List, Dict]:
-    with open(filename) as infile:
+    with open(filename, encoding="utf8") as infile:
         lines = infile.readlines()
         lines = [line.strip() for line in lines if line[0] != '#']
     chunks = list()

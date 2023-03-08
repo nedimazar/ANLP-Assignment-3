@@ -17,7 +17,9 @@ from torch.utils.data import SequentialSampler
 PAD_TOKEN_LABEL_ID = CrossEntropyLoss().ignore_index # -100
 
 BERT_MODEL_NAME = 'bert-base-multilingual-cased'
-SAVE_MODEL_DIR = "/content/drive/MyDrive/ding/code/bert4srl/saved_models/MY_BERT_NER"
+SAVE_MODEL_DIR = "saved_models/MY_BERT_NER"
+TESTFILE = "data/en_ewt-up-test.conllu"
+TRAINFILE = "data/en_ewt-up-train.conllu"
 EPOCHS = 2
 GPU_RUN_IX=0
 SEED_VAL = 1234500
@@ -169,10 +171,10 @@ def predictions():
     #                                                                                max_len=SEQ_MAX_LEN, 
     #                                                                                labels=test_labels, 
     #                                                                                label2index=label2index)
-    prediction_inputs, prediction_masks, gold_labels = read_two("/content/drive/MyDrive/ding/code/bert4srl/data/en_ewt-up-test.conllu")
+    prediction_inputs, prediction_masks, gold_labels = read_two(TESTFILE)
 
     if FILE_HAS_GOLD:
-        prediction_data, prediction_sampler, prediction_dataloader, index2label = get_data("/content/drive/MyDrive/ding/code/bert4srl/data/en_ewt-up-test.conllu")
+        prediction_data, prediction_sampler, prediction_dataloader, index2label = get_data(TESTFILE)
         # prediction_data = TensorDataset(prediction_inputs, prediction_masks, gold_labels, seq_lens)
         # prediction_sampler = SequentialSampler(prediction_data)
         # prediction_dataloader = DataLoader(prediction_data, sampler=prediction_sampler, batch_size=BATCH_SIZE)
@@ -216,9 +218,9 @@ def predictions():
 if __name__ == "__main__":
     tokenizer = BertTokenizer.from_pretrained(BERT_MODEL_NAME, do_basic_tokenize=False)
  
-    train_data, train_sampler, train_dataloader, index2label = get_data("/content/drive/MyDrive/ding/code/bert4srl/data/en_ewt-up-train.conllu")
+    train_data, train_sampler, train_dataloader, index2label = get_data(TRAINFILE)
     
-    dev_data, dev_sampler, dev_dataloader, index2labeltest = get_data("/content/drive/MyDrive/ding/code/bert4srl/data/en_ewt-up-test.conllu")
+    dev_data, dev_sampler, dev_dataloader, index2labeltest = get_data(TESTFILE)
 
     # print(len(index2label), len(index2labeltest))
     # print("Train Index labels", index2label)
