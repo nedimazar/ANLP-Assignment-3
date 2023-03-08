@@ -17,7 +17,7 @@ from transformers import (AdamW, BertForTokenClassification, BertTokenizer,
 PAD_TOKEN_LABEL_ID = CrossEntropyLoss().ignore_index # -100
 
 BERT_MODEL_NAME = 'bert-base-multilingual-cased'
-SAVE_MODEL_DIR = "/content/drive/MyDrive/ding/code/bert4srl/saved_models/MY_BERT_NER"
+SAVE_MODEL_DIR = "/Users/nazar/NLP/ANLP-Assignment-3/code/bert4srl/saved_models/MY_BERT_NER"
 EPOCHS = 2
 GPU_RUN_IX=0
 SEED_VAL = 1234500
@@ -169,7 +169,7 @@ def predictions():
     #                                                                                max_len=SEQ_MAX_LEN, 
     #                                                                                labels=test_labels, 
     #                                                                                label2index=label2index)
-    prediction_inputs, prediction_masks, gold_labels = read_two("/content/drive/MyDrive/ding/code/bert4srl/data/en_ewt-up-test.conllu")
+    prediction_inputs, prediction_masks, gold_labels = read_two("/Users/nazar/NLP/ANLP-Assignment-3/code/bert4srl/data/en_ewt-up-test.conllu")
 
     if FILE_HAS_GOLD:
         prediction_data, prediction_sampler, prediction_dataloader, index2label = get_data("/content/drive/MyDrive/ding/code/bert4srl/data/en_ewt-up-test.conllu")
@@ -216,9 +216,9 @@ def predictions():
 if __name__ == "__main__":
     tokenizer = BertTokenizer.from_pretrained(BERT_MODEL_NAME, do_basic_tokenize=False)
  
-    train_data, train_sampler, train_dataloader, index2label = get_data("/content/drive/MyDrive/ding/code/bert4srl/data/en_ewt-up-train.conllu")
+    train_data, train_sampler, train_dataloader, index2label = get_data("/Users/nazar/NLP/ANLP-Assignment-3/code/bert4srl/data/en_ewt-up-train.conllu")
     
-    dev_data, dev_sampler, dev_dataloader, index2labeltest = get_data("/content/drive/MyDrive/ding/code/bert4srl/data/en_ewt-up-test.conllu")
+    dev_data, dev_sampler, dev_dataloader, index2labeltest = get_data("/Users/nazar/NLP/ANLP-Assignment-3/code/bert4srl/data/en_ewt-up-test.conllu")
 
     # print(len(index2label), len(index2labeltest))
     # print("Train Index labels", index2label)
