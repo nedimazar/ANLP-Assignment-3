@@ -226,9 +226,8 @@ def evaluate_bert_model(eval_dataloader: DataLoader, eval_batch_size: int, model
     for batch in eval_dataloader:
         # Add batch to GPU
         batch = tuple(t.to(device) for t in batch)
-
         # Unpack the inputs from our dataloader
-        b_input_ids, b_input_mask, b_labels, b_len = batch
+        b_input_ids, b_input_mask, b_labels = batch
 
         with torch.no_grad():
             outputs = model(b_input_ids, attention_mask=b_input_mask, labels=b_labels)

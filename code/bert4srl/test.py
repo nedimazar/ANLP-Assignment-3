@@ -11,13 +11,13 @@ from transformers import BertTokenizer
 from tqdm import tqdm
 import torch
 from torch.nn import CrossEntropyLoss
-
+from transformers import pipeline
+from torch.utils.data import SequentialSampler
 
 PAD_TOKEN_LABEL_ID = CrossEntropyLoss().ignore_index # -100
 
 BERT_MODEL_NAME = 'bert-base-multilingual-cased'
 SAVE_MODEL_DIR = "saved_models/MY_BERT_NER/"
-BATCH_SIZE = 4
 EPOCHS = 2
 GPU_RUN_IX=0
 SEED_VAL = 1234500
@@ -121,6 +121,97 @@ def get_data(file_name):
     train_dataloader = DataLoader(train_data, sampler=train_sampler, batch_size=BATCH_SIZE)
     
     return train_data, train_sampler, train_dataloader, index2label
+
+def read_two(file_name): 
+    all_sentences, labels, label_dict, all_preds, chunked = util.read_json_srl(file_name)
+    max_length = (max([len(x) for x in all_sentences]))
+    tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased', do_lower_case=False)
+
+
+    train_features = convert_to_features(chunked[:5], tokenizer, label_dict, max_length)
+    # print(features[0].input_ids, features[0].attention_mask, features[0].token_type_ids, features[0].label_ids)
+    
+    # Initialize Tokenizer
+    tokenizer = BertTokenizer.from_pretrained(BERT_MODEL_NAME, do_basic_tokenize=False)
+
+    # train_features = convert_to_features(train_data, tokenizer, train_label2index, SEQ_MAX_LEN)
+    train_inputs = torch.tensor([f.input_ids for f in train_features], dtype=torch.long)
+    train_masks = torch.tensor([f.attention_mask for f in train_features], dtype=torch.long)
+    train_labels = torch.tensor([f.label_ids for f in train_features], dtype=torch.long)
+    return train_inputs, train_masks, train_labels
+    
+def predictions():
+    GPU_IX=0
+    _, USE_CUDA = util.get_torch_device(GPU_IX)
+    FILE_HAS_GOLD = True
+    SEQ_MAX_LEN = 256
+    BATCH_SIZE = 4
+    # IMPORTANT NOTE: We predict on the dev set to make the results comparable with your previous models from this course
+    TEST_DATA_PATH = "data/trial_mini_data.conll" # "data/conll2003.dev.conll"
+    # TEST_DATA_PATH = "data/trial_unk_data.conll"
+    MODEL_DIR = "saved_models/MY_BERT_NER/"
+    LOAD_EPOCH = 1
+    INPUTS_PATH=f"{MODEL_DIR}/EPOCH_{LOAD_EPOCH}/model_inputs.txt"
+    OUTPUTS_PATH=f"{MODEL_DIR}/EPOCH_{LOAD_EPOCH}/model_outputs.txt"
+    PAD_TOKEN_LABEL_ID = CrossEntropyLoss().ignore_index # -100
+
+    console_hdlr = logging.StreamHandler(sys.stdout)
+    file_hdlr = logging.FileHandler(filename=f"{MODEL_DIR}/EPOCH_{LOAD_EPOCH}/BERT_TokenClassifier_predictions.log")
+    logging.basicConfig(level=logging.INFO, handlers=[console_hdlr, file_hdlr])
+
+    model, tokenizer = util.load_model(BertForTokenClassification, BertTokenizer, f"{MODEL_DIR}/EPOCH_{LOAD_EPOCH}")
+    label2index = util.load_label_dict(f"{MODEL_DIR}/label2index.json")
+    index2label = {v:k for k,v in label2index.items()}
+    seq_lens = len(label2index)
+    # test_data, test_labels, _ = util.read_conll(TEST_DATA_PATH, has_labels=FILE_HAS_GOLD)
+    # prediction_inputs, prediction_masks, gold_labels, seq_lens = util.data_to_tensors(test_data, 
+    #                                                                                tokenizer, 
+    #                                                                                max_len=SEQ_MAX_LEN, 
+    #                                                                                labels=test_labels, 
+    #                                                                                label2index=label2index)
+    prediction_inputs, prediction_masks, gold_labels = read_two("/Users/jonas/Desktop/Dutsy/ANLP-Assignment-3/code/bert4srl/data/en_ewt-up-test.conllu")
+
+    if FILE_HAS_GOLD:
+        prediction_data, prediction_sampler, prediction_dataloader, index2label = get_data("/Users/jonas/Desktop/Dutsy/ANLP-Assignment-3/code/bert4srl/data/en_ewt-up-test.conllu")
+        # prediction_data = TensorDataset(prediction_inputs, prediction_masks, gold_labels, seq_lens)
+        # prediction_sampler = SequentialSampler(prediction_data)
+        # prediction_dataloader = DataLoader(prediction_data, sampler=prediction_sampler, batch_size=BATCH_SIZE)
+
+        logging.info('Predicting labels for {:,} test sentences...'.format(len(prediction_inputs)))
+        
+        results, preds_list = util.evaluate_bert_model(prediction_dataloader, BATCH_SIZE, model, tokenizer, index2label, 
+                                                            PAD_TOKEN_LABEL_ID, full_report=True, prefix="Test Set")
+        logging.info("  Test Loss: {0:.2f}".format(results['loss']))
+        logging.info("  Precision: {0:.2f} || Recall: {1:.2f} || F1: {2:.2f}".format(results['precision']*100, results['recall']*100, results['f1']*100))
+
+        with open(OUTPUTS_PATH, "w") as fout:
+            with open(INPUTS_PATH, "w") as fin:
+                for sent, pred in preds_list:
+                    fin.write(" ".join(sent)+"\n")
+                    fout.write(" ".join(pred)+"\n")
+
+    else:
+        # https://huggingface.co/transformers/main_classes/pipelines.html#transformers.TokenClassificationPipeline
+        print("Werkt niet!")
+        # logging.info('Predicting labels for {:,} test sentences...'.format(len(test_data)))
+        # if not USE_CUDA: GPU_IX = -1
+        # nlp = pipeline('token-classification', model=model, tokenizer=tokenizer, device=GPU_IX)
+        # nlp.ignore_labels = []
+        # with open(OUTPUTS_PATH, "w") as fout:
+        #     with open(INPUTS_PATH, "w") as fin:
+        #         for seq_ix, seq in enumerate(test_data):
+        #             sentence = " ".join(seq)
+        #             predicted_labels = []
+        #             output_obj = nlp(sentence)
+        #             # [print(o) for o in output_obj]
+        #             for tok in output_obj:
+        #                 if '##' not in tok['word']:
+        #                     predicted_labels.append(tok['entity'])
+        #             logging.info(f"\n----- {seq_ix+1} -----\n{seq}\nPRED:{predicted_labels}")
+        #             fin.write(sentence+"\n")
+        #             fout.write(" ".join(predicted_labels)+"\n")
+    
+    
 # function that reads the util code
 if __name__ == "__main__":
     tokenizer = BertTokenizer.from_pretrained(BERT_MODEL_NAME, do_basic_tokenize=False)
@@ -129,9 +220,11 @@ if __name__ == "__main__":
     
     dev_data, dev_sampler, dev_dataloader, index2labeltest = get_data("/Users/jonas/Desktop/Dutsy/ANLP-Assignment-3/code/bert4srl/data/en_ewt-up-test.conllu")
 
-    print(len(index2label), len(index2labeltest))
-    print("Train Index labels", index2label)
-    print("Test Index labels", index2labeltest)
+    # print(len(index2label), len(index2labeltest))
+    # print("Train Index labels", index2label)
+    # print("Test Index labels", index2labeltest)
+    util.save_label_dict(index2label, filename=LABELS_FILENAME)
+
     model = BertForTokenClassification.from_pretrained(BERT_MODEL_NAME, num_labels=len(index2label))
     model.config.finetuning_task = 'token-classification'
     model.config.id2label = index2label
@@ -223,3 +316,6 @@ if __name__ == "__main__":
     util.save_losses(loss_dev_values, filename=LOSS_DEV_FILENAME)
     logging.info("")
     logging.info("Training complete!")
+
+
+    predictions()
