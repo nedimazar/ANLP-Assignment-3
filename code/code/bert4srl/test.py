@@ -18,8 +18,8 @@ PAD_TOKEN_LABEL_ID = CrossEntropyLoss().ignore_index # -100
 
 BERT_MODEL_NAME = 'bert-base-multilingual-cased'
 SAVE_MODEL_DIR = "saved_models/MY_BERT_NER"
-TESTFILE = "data/en_ewt-up-test.conllu"
-TRAINFILE = "data/en_ewt-up-train.conllu"
+TESTFILE = "/Users/jonas/Desktop/Dutsy/ANLP-Assignment-3/code/bert4srl/data/en_ewt-up-test.conllu"
+TRAINFILE = "/Users/jonas/Desktop/Dutsy/ANLP-Assignment-3/code/bert4srl/data/en_ewt-up-train.conllu"
 EPOCHS = 2
 GPU_RUN_IX=0
 SEED_VAL = 1234500
@@ -37,24 +37,26 @@ LOSS_TRN_FILENAME = f"{SAVE_MODEL_DIR}/Losses_Train_{EPOCHS}.json"
 LOSS_DEV_FILENAME = f"{SAVE_MODEL_DIR}/Losses_Dev_{EPOCHS}.json"
 
 class InputFeatures(object):
-    def __init__(self, input_ids, attention_mask, token_type_ids, label_ids):
+    def __init__(self, input_ids, attention_mask, token_type_ids, label_ids, predicate_mask):
         self.input_ids = input_ids
         self.attention_mask = attention_mask
         self.token_type_ids = token_type_ids
         self.label_ids = label_ids
+        self.predicate_mask = predicate_mask
 
-def convert_to_features(data, tokenizer, label_dict, max_seq_length):
+
+
+def convert_to_features(data_list, tokenizer, label_dict, max_seq_length):
     """Converts a list of dictionaries to a list of InputFeatures."""
+
+    # Create binary sequence to indicate which predicate is being labeled
+    predicate_mask = [[1 if i == instance['pred_sense'][0] else 0 for i in range(len(instance['seq_words']))]
+                      for ins in data_list for instance in ins]
 
     features = []
 
-    for ins in tqdm(data):
-        # Create binary sequence to indicate which predicate is being labeled
-        for instance in ins:
-            # print(instance)
-            predicate_idx = instance['pred_sense'][0]
-            predicate_mask = [1 if i == predicate_idx else 0 for i in range(len(instance['seq_words']))]
-
+    for ins, pred_mask in zip(tqdm(data_list), predicate_mask):
+        for instance, mask in zip(ins, pred_mask):
             # Tokenize the input sentence and get the token-to-character alignments
             tokens = []
             char_to_word_offset = []
@@ -76,21 +78,18 @@ def convert_to_features(data, tokenizer, label_dict, max_seq_length):
             token_type_ids = [0] * len(tokens)
 
             # Pad input ids, attention mask, and token type ids with zeros
+            mask = [mask]
             padding_length = max_seq_length - len(input_ids)
             input_ids += [0] * padding_length
             attention_mask += [0] * padding_length
             token_type_ids += [0] * padding_length
-            predicate_mask += [0] * padding_length
+            mask += [0] * padding_length
 
             # Create InputFeatures object and append to features list
-            # label_ids = instance['bio']
             label_padding_length = max_seq_length - len(instance['bio'])
-            label_ids = [label_dict[el] for el in instance['bio']]
-            label_ids += [0] * label_padding_length
-            # for el in instance['bio']:
-                # label_ids.append(label_dict[el])
+            label_ids = list(map(lambda x: label_dict[x], instance['bio'])) + [0] * label_padding_length
             features.append(InputFeatures(input_ids=input_ids, attention_mask=attention_mask,
-                                          token_type_ids=token_type_ids, label_ids=label_ids))
+                                          token_type_ids=token_type_ids, label_ids=label_ids, predicate_mask=mask))
 
     return features
 
@@ -98,11 +97,13 @@ def convert_to_features(data, tokenizer, label_dict, max_seq_length):
 def get_data(file_name):
 
     all_sentences, labels, label_dict, all_preds, chunked = util.read_json_srl(file_name)
+    
+    print(all_sentences[0], labels[0], label_dict, all_preds[0], chunked[0])
     max_length = (max([len(x) for x in all_sentences]))
     tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased', do_lower_case=False)
 
 
-    train_features = convert_to_features(chunked, tokenizer, label_dict, max_length)
+    train_features = convert_to_features(chunked[:5], tokenizer, label_dict, max_length)
     # print(features[0].input_ids, features[0].attention_mask, features[0].token_type_ids, features[0].label_ids)
     
     # Initialize Tokenizer
@@ -131,7 +132,6 @@ def read_two(file_name):
 
 
     train_features = convert_to_features(chunked[:5], tokenizer, label_dict, max_length)
-    # print(features[0].input_ids, features[0].attention_mask, features[0].token_type_ids, features[0].label_ids)
     
     # Initialize Tokenizer
     tokenizer = BertTokenizer.from_pretrained(BERT_MODEL_NAME, do_basic_tokenize=False)
@@ -165,54 +165,33 @@ def predictions():
     label2index = util.load_label_dict(f"{MODEL_DIR}/label2index.json")
     index2label = {v:k for k,v in label2index.items()}
     seq_lens = len(label2index)
-    # test_data, test_labels, _ = util.read_conll(TEST_DATA_PATH, has_labels=FILE_HAS_GOLD)
-    # prediction_inputs, prediction_masks, gold_labels, seq_lens = util.data_to_tensors(test_data, 
-    #                                                                                tokenizer, 
-    #                                                                                max_len=SEQ_MAX_LEN, 
-    #                                                                                labels=test_labels, 
-    #                                                                                label2index=label2index)
     prediction_inputs, prediction_masks, gold_labels = read_two(TESTFILE)
 
-    if FILE_HAS_GOLD:
-        prediction_data, prediction_sampler, prediction_dataloader, index2label = get_data(TESTFILE)
-        # prediction_data = TensorDataset(prediction_inputs, prediction_masks, gold_labels, seq_lens)
-        # prediction_sampler = SequentialSampler(prediction_data)
-        # prediction_dataloader = DataLoader(prediction_data, sampler=prediction_sampler, batch_size=BATCH_SIZE)
 
-        logging.info('Predicting labels for {:,} test sentences...'.format(len(prediction_inputs)))
-        
-        results, preds_list = util.evaluate_bert_model(prediction_dataloader, BATCH_SIZE, model, tokenizer, index2label, 
-                                                            PAD_TOKEN_LABEL_ID, full_report=True, prefix="Test Set")
-        logging.info("  Test Loss: {0:.2f}".format(results['loss']))
-        logging.info("  Precision: {0:.2f} || Recall: {1:.2f} || F1: {2:.2f}".format(results['precision']*100, results['recall']*100, results['f1']*100))
+    prediction_data, prediction_sampler, prediction_dataloader, index2label = get_data(TESTFILE)
 
-        with open(OUTPUTS_PATH, "w") as fout:
-            with open(INPUTS_PATH, "w") as fin:
-                for sent, pred in preds_list:
-                    fin.write(" ".join(sent)+"\n")
-                    fout.write(" ".join(pred)+"\n")
 
-    else:
-        # https://huggingface.co/transformers/main_classes/pipelines.html#transformers.TokenClassificationPipeline
-        print("Werkt niet!")
-        # logging.info('Predicting labels for {:,} test sentences...'.format(len(test_data)))
-        # if not USE_CUDA: GPU_IX = -1
-        # nlp = pipeline('token-classification', model=model, tokenizer=tokenizer, device=GPU_IX)
-        # nlp.ignore_labels = []
-        # with open(OUTPUTS_PATH, "w") as fout:
-        #     with open(INPUTS_PATH, "w") as fin:
-        #         for seq_ix, seq in enumerate(test_data):
-        #             sentence = " ".join(seq)
-        #             predicted_labels = []
-        #             output_obj = nlp(sentence)
-        #             # [print(o) for o in output_obj]
-        #             for tok in output_obj:
-        #                 if '##' not in tok['word']:
-        #                     predicted_labels.append(tok['entity'])
-        #             logging.info(f"\n----- {seq_ix+1} -----\n{seq}\nPRED:{predicted_labels}")
-        #             fin.write(sentence+"\n")
-        #             fout.write(" ".join(predicted_labels)+"\n")
+    logging.info('Predicting labels for {:,} test sentences...'.format(len(prediction_inputs)))
     
+    results, preds_list = util.evaluate_bert_model(prediction_dataloader, BATCH_SIZE, model, tokenizer, index2label, 
+                                                        PAD_TOKEN_LABEL_ID, full_report=True, prefix="Test Set")
+    logging.info("  Test Loss: {0:.2f}".format(results['loss']))
+    logging.info("  Precision: {0:.2f} || Recall: {1:.2f} || F1: {2:.2f}".format(results['precision']*100, results['recall']*100, results['f1']*100))
+
+    with open(OUTPUTS_PATH, "w") as fout:
+        with open(INPUTS_PATH, "w") as fin:
+            for sent, pred in preds_list:
+                fin.write(" ".join(sent)+"\n")
+                fout.write(" ".join(pred)+"\n")
+
+
+
+def toTensor():
+    LongTensor = torch.cuda.LongTensor if USE_CUDA else torch.LongTensor
+
+
+
+
     
 # function that reads the util code
 if __name__ == "__main__":
@@ -242,10 +221,7 @@ if __name__ == "__main__":
                                             num_warmup_steps=0,
                                             num_training_steps=total_steps)
     
-    
-    
     loss_trn_values, loss_dev_values = [], []
-
 
     for epoch_i in tqdm(range(1, EPOCHS+1)):
         # Perform one full pass over the training set.

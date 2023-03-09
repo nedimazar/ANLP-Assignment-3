@@ -10,23 +10,7 @@ import logging, re
 from seqeval.metrics import f1_score, precision_score, recall_score, classification_report
 from transformers.utils.dummy_pt_objects import BertModel
 from transformers import get_linear_schedule_with_warmup
-import datetime
-import json
-import logging
-import os
-import re
-import sys
-from typing import Dict, List, Tuple
 
-import numpy as np
-import torch
-from keras.preprocessing.sequence import pad_sequences
-from seqeval.metrics import (classification_report, f1_score, precision_score,
-                             recall_score)
-from torch.utils.data import DataLoader
-from transformers import BertTokenizer
-from transformers.utils import logging
-from transformers.utils.dummy_pt_objects import BertModel
 
 logger = logging.getLogger(__name__)
 
@@ -155,7 +139,7 @@ def add_to_label_dict(labels:List, label_dict: Dict) -> Dict:
     return label_dict
 
 def read_json_srl(filename: str, delimiter: str='\t', has_labels: bool=True) -> Tuple[List, List, Dict]:
-    with open(filename, encoding="utf8") as infile:
+    with open(filename) as infile:
         lines = infile.readlines()
         lines = [line.strip() for line in lines if line[0] != '#']
     chunks = list()
@@ -187,15 +171,13 @@ def get_json(chunk, delimiter='\t'):
     
     for line in chunk:         
         tokens = line.split(delimiter)
-
-        if "." not in tokens[0]:
-            sentence.append(tokens[1])
-            if len(tokens)>= 11 and tokens[10] != '_':
-                predicate_senses[pred_index]["pred_sense"] = [int(float(tokens[0])) -1, tokens[10]]
-                pred_index += 1
-            preds = tokens[11:]
-            for i, pred in enumerate(preds):
-                predicate_senses[i]['bio'].append(pred)
+        sentence.append(tokens[1])
+        if len(tokens)>= 11 and tokens[10] != '_':
+            predicate_senses[pred_index]["pred_sense"] = [int(float(tokens[0])) -1, tokens[10]]
+            pred_index += 1
+        preds = tokens[11:]
+        for i, pred in enumerate(preds):
+            predicate_senses[i]['bio'].append(pred)
     for i in range(len(predicate_senses)):
         predicate_senses[i]["seq_words"] = sentence
         
@@ -267,8 +249,8 @@ def evaluate_bert_model(eval_dataloader: DataLoader, eval_batch_size: int, model
     gold_label_list = [[] for _ in range(gold_label_ids.shape[0])]
     pred_label_list = [[] for _ in range(gold_label_ids.shape[0])]
     full_word_preds = []
+    label_map = {value: key for key, value in label_map.items()}
 
-    logger.info(label_map)
     for seq_ix in range(gold_label_ids.shape[0]):
         for j in range(gold_label_ids.shape[1]):
             if gold_label_ids[seq_ix, j] != pad_token_label_id:
