@@ -74,10 +74,9 @@ def expand_to_wordpieces(original_sentence: List, tokenizer: BertTokenizer, orig
         return word_pieces, labels
     else:
         return word_pieces, []
-        
 
 def data_to_tensors(dataset: List, tokenizer: BertTokenizer, max_len: int, labels: List=None, label2index: Dict=None, pad_token_label_id: int=-100) -> Tuple:
-    tokenized_sentences, label_indices = [], []
+    tokenized_sentences, label_indices, predicate_indices = [], [], []
     problems = set()
     for i, sentence in enumerate(dataset):
         # Get WordPiece Indices
@@ -90,16 +89,24 @@ def data_to_tensors(dataset: List, tokenizer: BertTokenizer, max_len: int, label
                     problems.add(tuple(sentence))
                 continue
 
+            # Extract predicates and predicate indices
+            predicates = (labels[i])
+            # predicates = extract_predicates(sentence)
+            predicate_index = [1 if word in predicates == "V" else 0 for word in sentence]
+
             label_indices.append([label2index.get(lbl, pad_token_label_id) for lbl in labelset])
         else:
              wordpieces, labelset = expand_to_wordpieces(sentence, tokenizer, None)
+             predicate_index = [0] * len(sentence)
         input_ids = tokenizer.convert_tokens_to_ids(wordpieces)
         tokenized_sentences.append(input_ids)
+        predicate_indices.append(predicate_index)
 
     seq_lengths = [len(s) for s in tokenized_sentences]
     logger.info(f"MAX TOKENIZED SEQ LENGTH IN DATASET IS {max(seq_lengths)}")
     # PAD ALL SEQUENCES
     input_ids = pad_sequences(tokenized_sentences, maxlen=max_len, dtype="long", value=0, truncating="post", padding="post")
+    predicate_ids = pad_sequences(predicate_indices, maxlen=max_len, dtype="long", value=0, truncating="post", padding="post")
     if label_indices:
         label_ids = pad_sequences(label_indices, maxlen=max_len, dtype="long", value=pad_token_label_id, truncating="post", padding="post")
         label_ids = LongTensor(label_ids)
@@ -116,7 +123,51 @@ def data_to_tensors(dataset: List, tokenizer: BertTokenizer, max_len: int, label
         # Store the attention mask for this sentence.
         attention_masks.append(att_mask)
     print("Total fucked sentences:", len(problems))
-    return LongTensor(input_ids), LongTensor(attention_masks), label_ids,  LongTensor(seq_lengths)
+    return LongTensor(input_ids), LongTensor(attention_masks), LongTensor(predicate_ids), label_ids, LongTensor(seq_lengths)
+
+
+
+# def data_to_tensors(dataset: List, tokenizer: BertTokenizer, max_len: int, labels: List=None, label2index: Dict=None, pad_token_label_id: int=-100) -> Tuple:
+#     tokenized_sentences, label_indices = [], []
+#     problems = set()
+#     for i, sentence in enumerate(dataset):
+#         # Get WordPiece Indices
+#         if labels and label2index:
+#             try:
+#                 wordpieces, labelset = expand_to_wordpieces(sentence, tokenizer, labels[i])
+#             except Exception as e:
+#                 if tuple(sentence) not in problems:
+#                     print("Problem expanding: ", " ".join(sentence))
+#                     problems.add(tuple(sentence))
+#                 continue
+
+#             label_indices.append([label2index.get(lbl, pad_token_label_id) for lbl in labelset])
+#         else:
+#              wordpieces, labelset = expand_to_wordpieces(sentence, tokenizer, None)
+#         input_ids = tokenizer.convert_tokens_to_ids(wordpieces)
+#         tokenized_sentences.append(input_ids)
+
+#     seq_lengths = [len(s) for s in tokenized_sentences]
+#     logger.info(f"MAX TOKENIZED SEQ LENGTH IN DATASET IS {max(seq_lengths)}")
+#     # PAD ALL SEQUENCES
+#     input_ids = pad_sequences(tokenized_sentences, maxlen=max_len, dtype="long", value=0, truncating="post", padding="post")
+#     if label_indices:
+#         label_ids = pad_sequences(label_indices, maxlen=max_len, dtype="long", value=pad_token_label_id, truncating="post", padding="post")
+#         label_ids = LongTensor(label_ids)
+#     else:
+#         label_ids = None
+#     # Create attention masks
+#     attention_masks = []
+#     # For each sentence...
+#     for i, sent in enumerate(input_ids):
+#         # Create the attention mask.
+#         #   - If a token ID is 0, then it's padding, set the mask to 0.
+#         #   - If a token ID is > 0, then it's a real token, set the mask to 1.
+#         att_mask = [int(token_id > 0) for token_id in sent]
+#         # Store the attention mask for this sentence.
+#         attention_masks.append(att_mask)
+#     print("Total fucked sentences:", len(problems))
+#     return LongTensor(input_ids), LongTensor(attention_masks), label_ids,  LongTensor(seq_lengths)
 
 
 def get_annotatated_sentence(rows: List, has_labels: bool) -> Tuple[List, List]:
@@ -225,9 +276,10 @@ def evaluate_bert_model(eval_dataloader: DataLoader, eval_batch_size: int, model
     model.eval()
     for batch in eval_dataloader:
         # Add batch to GPU
+
         batch = tuple(t.to(device) for t in batch)
         # Unpack the inputs from our dataloader
-        b_input_ids, b_input_mask, b_labels = batch
+        b_input_ids, b_input_mask, b_labels, _ = batch
 
         with torch.no_grad():
             outputs = model(b_input_ids, attention_mask=b_input_mask, labels=b_labels)
@@ -258,7 +310,7 @@ def evaluate_bert_model(eval_dataloader: DataLoader, eval_batch_size: int, model
                 pred_label_list[seq_ix].append(label_map[preds[seq_ix][j]])
 
 
-        if True:
+        if False:
             wordpieces = tokenizer.convert_ids_to_tokens(input_ids[seq_ix], skip_special_tokens=True) 
             full_words, _ = wordpieces_to_tokens(wordpieces, labelpieces=None)
             full_preds = pred_label_list[seq_ix]
@@ -271,13 +323,13 @@ def evaluate_bert_model(eval_dataloader: DataLoader, eval_batch_size: int, model
     print(pred_label_list[10])
     results = {
         "loss": eval_loss,
-        "precision": precision_score(gold_label_list[10], pred_label_list[10]),
+        "precision": precision_score(gold_label_list, pred_label_list),
         "recall": recall_score(gold_label_list, pred_label_list),
         "f1": f1_score(gold_label_list, pred_label_list),
     }
 
-    if True:
-        print("\n\n"+classification_report(gold_label_list[10], pred_label_list[10]))
+    if False:
+        print("\n\n"+classification_report([gold_label_list[10]], [pred_label_list[10]]))
     return results, full_word_preds
 
 

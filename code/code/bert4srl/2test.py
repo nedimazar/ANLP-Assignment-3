@@ -21,7 +21,7 @@ torch.backends.cuda.max_split_size_bytes = 64 * 1024 * 1024
 BERT_MODEL_NAME = 'bert-base-multilingual-cased'
 SAVE_MODEL_DIR = "saved_models/MY_BERT_NER"
 TESTFILE = "data\en_ewt-up-test.conllu"
-TRAINFILE = "data\en_ewt-up-test.conllu"
+TRAINFILE = "data\en_ewt-up-train.conllu"
 EPOCHS = 4
 GPU_RUN_IX=0
 SEED_VAL = 1234500
@@ -38,49 +38,6 @@ BATCH_SIZE = 8
 LABELS_FILENAME = f"{SAVE_MODEL_DIR}/label2index.json"
 LOSS_TRN_FILENAME = f"{SAVE_MODEL_DIR}/Losses_Train_{EPOCHS}.json"
 LOSS_DEV_FILENAME = f"{SAVE_MODEL_DIR}/Losses_Dev_{EPOCHS}.json"
-
-def predictions():
-    GPU_IX=0
-    _, USE_CUDA = util.get_torch_device(GPU_IX)
-    FILE_HAS_GOLD = True
-    SEQ_MAX_LEN = 256
-    BATCH_SIZE = 4
-    # IMPORTANT NOTE: We predict on the dev set to make the results comparable with your previous models from this course
-    TEST_DATA_PATH = "data/trial_mini_data.conll" # "data/conll2003.dev.conll"
-    # TEST_DATA_PATH = "data/trial_unk_data.conll"
-    MODEL_DIR = "saved_models/MY_BERT_NER/"
-    LOAD_EPOCH = 1
-    INPUTS_PATH=f"{MODEL_DIR}/EPOCH_{LOAD_EPOCH}/model_inputs.txt"
-    OUTPUTS_PATH=f"{MODEL_DIR}/EPOCH_{LOAD_EPOCH}/model_outputs.txt"
-    PAD_TOKEN_LABEL_ID = CrossEntropyLoss().ignore_index # -100
-
-    console_hdlr = logging.StreamHandler(sys.stdout)
-    file_hdlr = logging.FileHandler(filename=f"{MODEL_DIR}/EPOCH_{LOAD_EPOCH}/BERT_TokenClassifier_predictions.log")
-    logging.basicConfig(level=print, handlers=[console_hdlr, file_hdlr])
-
-    model, tokenizer = util.load_model(BertForTokenClassification, BertTokenizer, f"{MODEL_DIR}/EPOCH_{LOAD_EPOCH}")
-    label2index = util.load_label_dict(f"{MODEL_DIR}/label2index.json")
-    index2label = {v:k for k,v in label2index.items()}
-    seq_lens = len(label2index)
-    # prediction_inputs, prediction_masks, gold_labels = read_two(TESTFILE)
-
-
-    prediction_data, prediction_sampler, prediction_dataloader, index2label = get_data(TESTFILE)
-
-
-    print('Predicting labels for {:,} test sentences...'.format(len(prediction_inputs)))
-    
-    results, preds_list = util.evaluate_bert_model(prediction_dataloader, BATCH_SIZE, model, tokenizer, index2label, 
-                                                        PAD_TOKEN_LABEL_ID, full_report=True, prefix="Test Set")
-    print("  Test Loss: {0:.2f}".format(results['loss']))
-    print("  Precision: {0:.2f} || Recall: {1:.2f} || F1: {2:.2f}".format(results['precision']*100, results['recall']*100, results['f1']*100))
-
-    with open(OUTPUTS_PATH, "w") as fout:
-        with open(INPUTS_PATH, "w") as fin:
-            for sent, pred in preds_list:
-                fin.write(" ".join(sent)+"\n")
-                fout.write(" ".join(pred)+"\n")
-
 
 
 def preprocess_data_for_bert(all_sentences, labels, label_dict, all_preds, max_length = 128):
@@ -145,7 +102,6 @@ def preprocess_data_for_bert(all_sentences, labels, label_dict, all_preds, max_l
             'attention_mask': attentionmask,
             'labels': tokenized_labels[i]
         })
-        # print(tokenized_labels, i)
     
 
     print("input_features", len(input_features), np.unique([len(f['input_ids']) for f in input_features]))
@@ -157,7 +113,7 @@ def get_data(file_name):
 
     all_sentences, labels, label_dict, all_preds, _ = util.read_json_srl(file_name)
     
-    input_features = preprocess_data_for_bert(all_sentences[:100], labels[:100], label_dict, all_preds[:100], max_length = SEQLENGTH)
+    input_features = preprocess_data_for_bert(all_sentences, labels, label_dict, all_preds, max_length = SEQLENGTH)
     
     return input_features,label_dict
 
@@ -169,35 +125,48 @@ def toTensor(train_data):
     
     return input_ids, masks, labels
 
+
 # function that reads the util code
 if __name__ == "__main__":
     tokenizer = BertTokenizer.from_pretrained(BERT_MODEL_NAME, do_basic_tokenize=False)
     
     # Load the training data
-    train_input_features, index2label = get_data(TRAINFILE)
-    train_inputs, train_masks, train_labels = toTensor(train_input_features)
-    
+    train_data, train_labels, train_label2index, all_preds, _ = util.read_json_srl(TRAINFILE)
+    train_inputs, train_masks, train_predicate_labels, train_labels, seq_lengths = util.data_to_tensors(train_data[:], 
+                                                                                                tokenizer, 
+                                                                                                max_len=SEQ_MAX_LEN, 
+                                                                                                labels=train_labels[:], 
+                                                                                                label2index=train_label2index,
+                                                                                                pad_token_label_id=PAD_TOKEN_LABEL_ID)
+
     # Create the DataLoader for our training set.
-    
-    train_data = TensorDataset(train_inputs, train_masks, torch.tensor(train_labels))
+    train_data = TensorDataset(train_inputs, train_masks, train_labels, train_predicate_labels)
     train_sampler = RandomSampler(train_data)
     train_dataloader = DataLoader(train_data, sampler=train_sampler, batch_size=BATCH_SIZE)
 
 
+
     # Load the validation data
-    dev_input_features, index2labeldev = get_data(TESTFILE)
-    dev_inputs, dev_masks, dev_labels = toTensor(dev_input_features)
-    # Create the DataLoader for our validation set.
-    dev_data = TensorDataset(dev_inputs, dev_masks, torch.tensor(dev_labels))
+    dev_data, dev_labels, dev_label2index, all_predsdev, _ = util.read_json_srl(TESTFILE)
+
+    dev_inputs, dev_masks,dev_predicate_labels,  dev_labels, dev_lens = util.data_to_tensors(dev_data, 
+                                                                    tokenizer, 
+                                                                    max_len=SEQ_MAX_LEN, 
+                                                                    labels=dev_labels, 
+                                                                    label2index=train_label2index,
+                                                                    pad_token_label_id=PAD_TOKEN_LABEL_ID)
+
+    # Create the DataLoader for our Development set.
+    dev_data = TensorDataset(dev_inputs, dev_masks, dev_labels, dev_predicate_labels)
     dev_sampler = RandomSampler(dev_data)
     dev_dataloader = DataLoader(dev_data, sampler=dev_sampler, batch_size=BATCH_SIZE)
     
-    util.save_label_dict(index2label, filename=LABELS_FILENAME)
+    util.save_label_dict(train_label2index, filename=LABELS_FILENAME)
 
-    model = BertForTokenClassification.from_pretrained(BERT_MODEL_NAME, num_labels=len(index2label))
+    model = BertForTokenClassification.from_pretrained(BERT_MODEL_NAME, num_labels=len(train_label2index))
     model.config.finetuning_task = 'token-classification'
-    model.config.id2label = index2label
-    model.config.label2id = index2label
+    model.config.id2label = train_label2index
+    model.config.label2id = train_label2index
     if USE_CUDA: model.cuda()
 
     # Total number of training steps is number of batches * number of epochs.
@@ -267,7 +236,7 @@ if __name__ == "__main__":
         # ========================================
         # After the completion of each training epoch, measure our performance on our validation set.
         t0 = time.time()
-        results, preds_list = util.evaluate_bert_model(dev_dataloader, BATCH_SIZE, model, tokenizer, index2label, PAD_TOKEN_LABEL_ID, prefix="Validation Set")
+        results, preds_list = util.evaluate_bert_model(dev_dataloader, BATCH_SIZE, model, tokenizer, train_label2index, PAD_TOKEN_LABEL_ID, prefix="Validation Set")
         loss_dev_values.append(results['loss'])
         print("  Validation Loss: {0:.2f}".format(results['loss']))
         print("  Precision: {0:.2f} || Recall: {1:.2f} || F1: {2:.2f}".format(results['precision']*100, results['recall']*100, results['f1']*100))
