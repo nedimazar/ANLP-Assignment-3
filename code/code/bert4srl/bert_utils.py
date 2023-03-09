@@ -75,6 +75,7 @@ def expand_to_wordpieces(original_sentence: List, tokenizer: BertTokenizer, orig
     else:
         return word_pieces, []
 
+# With predicate labels
 def data_to_tensors(dataset: List, tokenizer: BertTokenizer, max_len: int, labels: List=None, label2index: Dict=None, pad_token_label_id: int=-100) -> Tuple:
     tokenized_sentences, label_indices, predicate_indices = [], [], []
     problems = set()
@@ -90,14 +91,13 @@ def data_to_tensors(dataset: List, tokenizer: BertTokenizer, max_len: int, label
                 continue
 
             # Extract predicates and predicate indices
-            predicates = (labels[i])
-            # predicates = extract_predicates(sentence)
-            predicate_index = [1 if word in predicates == "V" else 0 for word in sentence]
 
             label_indices.append([label2index.get(lbl, pad_token_label_id) for lbl in labelset])
         else:
              wordpieces, labelset = expand_to_wordpieces(sentence, tokenizer, None)
              predicate_index = [0] * len(sentence)
+        sentence_labels = labels[i]
+        predicate_index = [1 if element in sentence_labels == "V" else 0 for element in sentence_labels]     
         input_ids = tokenizer.convert_tokens_to_ids(wordpieces)
         tokenized_sentences.append(input_ids)
         predicate_indices.append(predicate_index)
@@ -126,7 +126,7 @@ def data_to_tensors(dataset: List, tokenizer: BertTokenizer, max_len: int, label
     return LongTensor(input_ids), LongTensor(attention_masks), LongTensor(predicate_ids), label_ids, LongTensor(seq_lengths)
 
 
-
+# Without predicate labels
 # def data_to_tensors(dataset: List, tokenizer: BertTokenizer, max_len: int, labels: List=None, label2index: Dict=None, pad_token_label_id: int=-100) -> Tuple:
 #     tokenized_sentences, label_indices = [], []
 #     problems = set()
@@ -190,7 +190,7 @@ def add_to_label_dict(labels:List, label_dict: Dict) -> Dict:
     return label_dict
 
 def read_json_srl(filename: str, delimiter: str='\t', has_labels: bool=True) -> Tuple[List, List, Dict]:
-    with open(filename) as infile:
+    with open(filename,  encoding="utf8") as infile:
         lines = infile.readlines()
         lines = [line.strip() for line in lines if line[0] != '#']
     chunks = list()

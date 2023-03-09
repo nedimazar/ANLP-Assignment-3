@@ -12,6 +12,7 @@ from tqdm import tqdm
 import torch
 from torch.nn import CrossEntropyLoss
 from transformers import pipeline
+from sklearn.model_selection import train_test_split
 from torch.utils.data import SequentialSampler
 import warnings
 warnings.filterwarnings("ignore")
@@ -22,7 +23,7 @@ BERT_MODEL_NAME = 'bert-base-multilingual-cased'
 SAVE_MODEL_DIR = "saved_models/MY_BERT_NER"
 TESTFILE = "data\en_ewt-up-test.conllu"
 TRAINFILE = "data\en_ewt-up-train.conllu"
-EPOCHS = 4
+EPOCHS = 6
 GPU_RUN_IX=0
 SEED_VAL = 1234500
 SEQ_MAX_LEN = 256
@@ -130,13 +131,48 @@ def toTensor(train_data):
 if __name__ == "__main__":
     tokenizer = BertTokenizer.from_pretrained(BERT_MODEL_NAME, do_basic_tokenize=False)
     
-    # Load the training data
-    train_data, train_labels, train_label2index, all_preds, _ = util.read_json_srl(TRAINFILE)
-    train_inputs, train_masks, train_predicate_labels, train_labels, seq_lengths = util.data_to_tensors(train_data[:], 
+
+    # Load the training data Without predicate labels
+    # train_data, train_labels, labelindex, all_preds, _ = util.read_json_srl(TRAINFILE)
+    # train_inputs, train_masks, train_labels, seq_lengths = util.data_to_tensors(train_data[:5000], 
+    #                                                                                             tokenizer, 
+    #                                                                                             max_len=SEQ_MAX_LEN, 
+    #                                                                                             labels=train_labels[:5000], 
+    #                                                                                             label2index=labelindex,
+    #                                                                                             pad_token_label_id=PAD_TOKEN_LABEL_ID)
+
+    # # Create the DataLoader for our training set.
+    # train_data = TensorDataset(train_inputs, train_masks, train_labels)
+    # train_sampler = RandomSampler(train_data)
+    # train_dataloader = DataLoader(train_data, sampler=train_sampler, batch_size=BATCH_SIZE)
+
+
+
+    # # Load the validation data
+    # dev_data, dev_labels, dev_label2index, all_predsdev, _ = util.read_json_srl(TESTFILE)
+
+    # dev_inputs, dev_masks,  dev_labels, dev_lens = util.data_to_tensors(dev_data, 
+    #                                                                 tokenizer, 
+    #                                                                 max_len=SEQ_MAX_LEN, 
+    #                                                                 labels=dev_labels, 
+    #                                                                 label2index=labelindex,
+    #                                                                 pad_token_label_id=PAD_TOKEN_LABEL_ID)
+
+    # # Create the DataLoader for our Development set.
+    # dev_data = TensorDataset(dev_inputs, dev_masks, dev_labels)
+    # dev_sampler = RandomSampler(dev_data)
+    # dev_dataloader = DataLoader(dev_data, sampler=dev_sampler, batch_size=BATCH_SIZE)
+
+
+
+    # Load the training data With Predicate labels
+    data, label, labelindex, _, _ = util.read_json_srl(TRAINFILE)
+    X_train, X_test, y_train, y_test = train_test_split(data, label, test_size=0.2, random_state=42)
+    train_inputs, train_masks, train_predicate_labels, train_labels, seq_lengths = util.data_to_tensors(X_train, 
                                                                                                 tokenizer, 
                                                                                                 max_len=SEQ_MAX_LEN, 
-                                                                                                labels=train_labels[:], 
-                                                                                                label2index=train_label2index,
+                                                                                                labels=y_train, 
+                                                                                                label2index=labelindex,
                                                                                                 pad_token_label_id=PAD_TOKEN_LABEL_ID)
 
     # Create the DataLoader for our training set.
@@ -146,14 +182,14 @@ if __name__ == "__main__":
 
 
 
-    # Load the validation data
-    dev_data, dev_labels, dev_label2index, all_predsdev, _ = util.read_json_srl(TESTFILE)
+    # # Load the validation data
+    # dev_data, dev_labels, dev_label2index, all_predsdev, _ = util.read_json_srl(TESTFILE)
 
-    dev_inputs, dev_masks,dev_predicate_labels,  dev_labels, dev_lens = util.data_to_tensors(dev_data, 
+    dev_inputs, dev_masks,dev_predicate_labels,  dev_labels, dev_lens = util.data_to_tensors(X_test, 
                                                                     tokenizer, 
                                                                     max_len=SEQ_MAX_LEN, 
-                                                                    labels=dev_labels, 
-                                                                    label2index=train_label2index,
+                                                                    labels=y_test, 
+                                                                    label2index=labelindex,
                                                                     pad_token_label_id=PAD_TOKEN_LABEL_ID)
 
     # Create the DataLoader for our Development set.
@@ -161,12 +197,12 @@ if __name__ == "__main__":
     dev_sampler = RandomSampler(dev_data)
     dev_dataloader = DataLoader(dev_data, sampler=dev_sampler, batch_size=BATCH_SIZE)
     
-    util.save_label_dict(train_label2index, filename=LABELS_FILENAME)
+    util.save_label_dict(labelindex, filename=LABELS_FILENAME)
 
-    model = BertForTokenClassification.from_pretrained(BERT_MODEL_NAME, num_labels=len(train_label2index))
+    model = BertForTokenClassification.from_pretrained(BERT_MODEL_NAME, num_labels=len(labelindex))
     model.config.finetuning_task = 'token-classification'
-    model.config.id2label = train_label2index
-    model.config.label2id = train_label2index
+    model.config.id2label = labelindex
+    model.config.label2id = labelindex
     if USE_CUDA: model.cuda()
 
     # Total number of training steps is number of batches * number of epochs.
@@ -236,7 +272,7 @@ if __name__ == "__main__":
         # ========================================
         # After the completion of each training epoch, measure our performance on our validation set.
         t0 = time.time()
-        results, preds_list = util.evaluate_bert_model(dev_dataloader, BATCH_SIZE, model, tokenizer, train_label2index, PAD_TOKEN_LABEL_ID, prefix="Validation Set")
+        results, preds_list = util.evaluate_bert_model(dev_dataloader, BATCH_SIZE, model, tokenizer, labelindex, PAD_TOKEN_LABEL_ID, prefix="Validation Set")
         loss_dev_values.append(results['loss'])
         print("  Validation Loss: {0:.2f}".format(results['loss']))
         print("  Precision: {0:.2f} || Recall: {1:.2f} || F1: {2:.2f}".format(results['precision']*100, results['recall']*100, results['f1']*100))
