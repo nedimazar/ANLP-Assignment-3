@@ -286,7 +286,7 @@ def evaluate_bert_model(eval_dataloader: DataLoader, eval_batch_size: int, model
                 pred_label_list[seq_ix].append(label_map[preds[seq_ix][j]])
 
 
-        if False:
+        if full_report:
             wordpieces = tokenizer.convert_ids_to_tokens(input_ids[seq_ix], skip_special_tokens=True) 
             full_words, _ = wordpieces_to_tokens(wordpieces, labelpieces=None)
             full_preds = pred_label_list[seq_ix]
@@ -302,7 +302,7 @@ def evaluate_bert_model(eval_dataloader: DataLoader, eval_batch_size: int, model
         "f1": f1_score(gold_label_list, pred_label_list),
     }
 
-    if False:
+    if full_report:
         print("\n\n"+classification_report([gold_label_list[10]], [pred_label_list[10]]))
     return results, full_word_preds
 
