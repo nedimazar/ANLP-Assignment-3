@@ -353,7 +353,7 @@ def load_model(model_class, tokenizer_class, model_dir):
     model.to(device)
     return model, tokenizer
 
-def plot_loss(loss_values):
+def plot_loss(loss_values, filename = "loss.png"):
     x_values = range(1, len(loss_values) + 1)
 
     # plot the loss values
@@ -365,7 +365,7 @@ def plot_loss(loss_values):
 
     # add a title to the plot
     plt.title("Training Loss over Epochs")
-    plt.savefig("loss.png")
+    plt.savefig(filename)
 
 ##### Misc Functions ##### 
 

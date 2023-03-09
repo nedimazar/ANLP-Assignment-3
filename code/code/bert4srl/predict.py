@@ -23,7 +23,7 @@ def predictions(batchsize, epoch):
     FILE_HAS_GOLD = True
     SEQ_MAX_LEN = 256
     BATCH_SIZE = batchsize
-    # IMPORTANT NOTE: We predict on the dev set to make the results comparable with your previous models from this course
+
     TEST_DATA_PATH = "data\en_ewt-up-test.conllu" # "data/conll2003.dev.conll"
     # TEST_DATA_PATH = "data/trial_unk_data.conll"
     MODEL_DIR = "saved_models/MY_BERT_NER/"

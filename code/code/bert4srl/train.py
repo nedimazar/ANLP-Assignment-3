@@ -27,9 +27,9 @@ BERT_MODEL_NAME = 'bert-base-multilingual-cased'
 SAVE_MODEL_DIR = "saved_models/MY_BERT_NER"
 TESTFILE = "data\en_ewt-up-test.conllu"
 TRAINFILE = "data\en_ewt-up-train.conllu"
-EPOCHS = 4
+EPOCHS = 10
 GPU_RUN_IX=0
-SEED_VAL = 1234500
+SEED_VAL = 2332
 SEQ_MAX_LEN = 256
 GPU_IX=0
 SEQLENGTH = 512
@@ -38,13 +38,13 @@ device, USE_CUDA = util.get_torch_device(GPU_IX)
 
 PRINT_INFO_EVERY = 10 # Print status only every X batches
 GRADIENT_CLIP = 1.0
-LEARNING_RATE = 1e-5
-BATCH_SIZE = 8
+LEARNING_RATE = 1e-4
+BATCH_SIZE = 16
 LABELS_FILENAME = f"{SAVE_MODEL_DIR}/label2index.json"
 LOSS_TRN_FILENAME = f"{SAVE_MODEL_DIR}/Losses_Train_{EPOCHS}.json"
 LOSS_DEV_FILENAME = f"{SAVE_MODEL_DIR}/Losses_Dev_{EPOCHS}.json"
 
-def argparse():
+def args_function():
     parser = argparse.ArgumentParser()
     parser.add_argument('-trainpath', '--train_path', help='Path to Train set', default="data\en_ewt-up-train.conllu")
     parser.add_argument('-devpath', '--dev_path', help='Path to Dev Set', default="data\en_ewt-up-test.conllu")
@@ -56,7 +56,7 @@ def argparse():
 
 # function that reads the util code
 if __name__ == "__main__":
-    args = argparse()
+    args = args_function()
     SEQ_MAX_LEN = args.max_len
     BATCH_SIZE = args.batch_size
     EPOCHS = args.epochs
@@ -116,6 +116,8 @@ if __name__ == "__main__":
     loss_trn_values, loss_dev_values = [], []
 
     for epoch_i in (range(1, EPOCHS+1)):
+        epochplot = []
+
         # Perform one full pass over the training set.
         print("")
         print('======== Epoch {:} / {:} ========'.format(epoch_i, EPOCHS))
@@ -149,7 +151,7 @@ if __name__ == "__main__":
             optimizer.step()
             scheduler.step()
             loss_list.append(loss.item())
-
+            epochplot.append(loss.item())
             # Progress update
             if step % PRINT_INFO_EVERY == 0 and step != 0:
                 # Calculate elapsed time in minutes.
@@ -178,8 +180,9 @@ if __name__ == "__main__":
         print("  Precision: {0:.2f} || Recall: {1:.2f} || F1: {2:.2f}".format(results['precision']*100, results['recall']*100, results['f1']*100))
         print("  Validation took: {:}".format(util.format_time(time.time() - t0)))
 
-
+        util.plot_loss(epochplot, filename=f"{SAVE_MODEL_DIR}/EPOCH_{epoch_i}_loss.png")
         # Save Checkpoint for this Epoch
+
         util.save_model(f"{SAVE_MODEL_DIR}/EPOCH_{epoch_i}", {"args":[]}, model, tokenizer)
 
     ## Use matplotlip to plot the loss curve
