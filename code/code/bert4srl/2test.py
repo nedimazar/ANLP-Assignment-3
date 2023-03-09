@@ -16,6 +16,8 @@ from predict import predictions
 from sklearn.model_selection import train_test_split
 from torch.utils.data import SequentialSampler
 import warnings
+import matplotlib.pyplot as plt
+
 warnings.filterwarnings("ignore")
 
 PAD_TOKEN_LABEL_ID = CrossEntropyLoss().ignore_index # -100
@@ -24,7 +26,7 @@ BERT_MODEL_NAME = 'bert-base-multilingual-cased'
 SAVE_MODEL_DIR = "saved_models/MY_BERT_NER"
 TESTFILE = "data\en_ewt-up-test.conllu"
 TRAINFILE = "data\en_ewt-up-train.conllu"
-EPOCHS = 1
+EPOCHS = 4
 GPU_RUN_IX=0
 SEED_VAL = 1234500
 SEQ_MAX_LEN = 256
@@ -42,91 +44,6 @@ LOSS_TRN_FILENAME = f"{SAVE_MODEL_DIR}/Losses_Train_{EPOCHS}.json"
 LOSS_DEV_FILENAME = f"{SAVE_MODEL_DIR}/Losses_Dev_{EPOCHS}.json"
 
 
-def preprocess_data_for_bert(all_sentences, labels, label_dict, all_preds, max_length = 128):
-    # Create a binary sequence per instance indicating which predicate is currently labeling
-    binary_labels = []
-    for i, seq_labels in enumerate(labels):
-        binary_seq_labels = []
-        for j, label in enumerate(seq_labels):
-            if label == 'V':
-                binary_seq_labels.append(1)
-            else:
-                binary_seq_labels.append(0)
-        # make sure the length of the sequence is the same as the sentence through paddinf
-        binary_labels.append(binary_seq_labels)
-    
-    # Tokenize the sentences and map the labels to their corresponding label ids
-    tokenized_sentences = []
-    tokenized_labels = []
-    for i, sentence in enumerate(all_sentences):
-        tokenized_sentence = []
-        tokenized_label = []
-        for j, word in enumerate(sentence):
-            tokenized_word = tokenizer.tokenize(word)
-            tokenized_sentence.extend(tokenized_word)
-            if len(tokenized_word) == 1:
-                try:
-                    tokenized_label.append(label_dict[labels[i][j]])
-                except:
-                    tokenized_label.append(label_dict["_"])
-            else:
-                try:
-                    tokenized_label.extend([label_dict[labels[i][j]]])
-                except:
-                    tokenized_label.extend([label_dict["_"]])
-
-        # make sure the length of the sentence is not longer than the max length trhough padding
-
-        rest_length_label = max_length - len(tokenized_label)
-        tokenized_label += [0] * rest_length_label
-        tokenized_sentences.append(tokenized_sentence)
-        tokenized_labels.append(tokenized_label)
-        
-    # Convert the tokenized sentences and labels to input features and targets for BERT
-    
-    
-    input_features = []
-    targets = []
-    for i, sentence in enumerate(tokenized_sentences):
-        sentence = tokenizer.convert_tokens_to_ids(sentence)
-        binary_label = binary_labels[i]
-        sentence.extend(binary_label)
-        attention_mask_1 = len(sentence)
-        
-        padding_length = max_length - len(sentence)
-        
-        sentence += [0]*padding_length
-    
-
-        attentionmask = [1]*attention_mask_1 + [0]*padding_length
-        input_features.append({
-            'input_ids': sentence,
-            'attention_mask': attentionmask,
-            'labels': tokenized_labels[i]
-        })
-    
-
-    print("input_features", len(input_features), np.unique([len(f['input_ids']) for f in input_features]))
-    return input_features
-
-
-
-def get_data(file_name):
-
-    all_sentences, labels, label_dict, all_preds, _ = util.read_json_srl(file_name)
-    
-    input_features = preprocess_data_for_bert(all_sentences, labels, label_dict, all_preds, max_length = SEQLENGTH)
-    
-    return input_features,label_dict
-
-def toTensor(train_data):
-    
-    input_ids = torch.tensor([f['input_ids'] for f in train_data], dtype=torch.long)
-    masks = torch.tensor([f['attention_mask'] for f in train_data], dtype=torch.long)
-    labels = torch.tensor([f['labels'] for f in train_data], dtype=torch.long)
-    
-    return input_ids, masks, labels
-
 
 # function that reads the util code
 if __name__ == "__main__":
@@ -135,7 +52,7 @@ if __name__ == "__main__":
 
     # Load the training data With Predicate labels
     data, label, labelindex, _, _ = util.read_json_srl(TRAINFILE)
-    X_train, X_test, y_train, y_test = train_test_split(data[:10], label[:10], test_size=0.2, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(data, label, test_size=0.2, random_state=42)
     train_inputs, train_masks, train_predicate_labels, train_labels, seq_lengths = util.data_to_tensors(X_train, 
                                                                                                 tokenizer, 
                                                                                                 max_len=SEQ_MAX_LEN, 
@@ -162,12 +79,12 @@ if __name__ == "__main__":
     dev_dataloader = DataLoader(dev_data, sampler=dev_sampler, batch_size=BATCH_SIZE)
 
     labelindextemp = {value: key for key, value in labelindex.items()}
-
+    loss_list = []
     util.save_label_dict(labelindextemp, filename=LABELS_FILENAME)
 
     model = BertForTokenClassification.from_pretrained(BERT_MODEL_NAME, num_labels=len(labelindex))
     model.config.finetuning_task = 'token-classification'
-    model.config.id2label = labelindex
+    model.config.id2label = labelindextemp
     model.config.label2id = labelindex
     if USE_CUDA: model.cuda()
 
@@ -215,6 +132,7 @@ if __name__ == "__main__":
             # Update parameters
             optimizer.step()
             scheduler.step()
+            loss_list.append(loss.item())
 
             # Progress update
             if step % PRINT_INFO_EVERY == 0 and step != 0:
@@ -248,11 +166,13 @@ if __name__ == "__main__":
         # Save Checkpoint for this Epoch
         util.save_model(f"{SAVE_MODEL_DIR}/EPOCH_{epoch_i}", {"args":[]}, model, tokenizer)
 
-
+    ## Use matplotlip to plot the loss curve
+    print(loss_list)
+    util.plot_loss(loss_list)
     util.save_losses(loss_trn_values, filename=LOSS_TRN_FILENAME)
     util.save_losses(loss_dev_values, filename=LOSS_DEV_FILENAME)
     print("")
     print("Training complete!")
 
 
-    predictions(BATCH_SIZE)
+    predictions(BATCH_SIZE, EPOCHS)

@@ -10,6 +10,7 @@ import logging, re
 from seqeval.metrics import f1_score, precision_score, recall_score, classification_report
 from transformers.utils.dummy_pt_objects import BertModel
 from transformers import get_linear_schedule_with_warmup
+import matplotlib.pyplot as plt
 
 
 logger = logging.getLogger(__name__)
@@ -137,52 +138,10 @@ def data_to_tensors(dataset: List, tokenizer: BertTokenizer, max_len: int, label
         att_mask = [int(token_id > 0) for token_id in sent]
         # Store the attention mask for this sentence.
         attention_masks.append(att_mask)
-    print("Total fucked sentences:", len(problems))
+    # print("Total fucked sentences:", len(problems))
     return LongTensor(input_ids), LongTensor(attention_masks), LongTensor(predicate_ids), label_ids, LongTensor(seq_lengths)
 
 
-# Without predicate labels
-# def data_to_tensors(dataset: List, tokenizer: BertTokenizer, max_len: int, labels: List=None, label2index: Dict=None, pad_token_label_id: int=-100) -> Tuple:
-#     tokenized_sentences, label_indices = [], []
-#     problems = set()
-#     for i, sentence in enumerate(dataset):
-#         # Get WordPiece Indices
-#         if labels and label2index:
-#             try:
-#                 wordpieces, labelset = expand_to_wordpieces(sentence, tokenizer, labels[i])
-#             except Exception as e:
-#                 if tuple(sentence) not in problems:
-#                     print("Problem expanding: ", " ".join(sentence))
-#                     problems.add(tuple(sentence))
-#                 continue
-
-#             label_indices.append([label2index.get(lbl, pad_token_label_id) for lbl in labelset])
-#         else:
-#              wordpieces, labelset = expand_to_wordpieces(sentence, tokenizer, None)
-#         input_ids = tokenizer.convert_tokens_to_ids(wordpieces)
-#         tokenized_sentences.append(input_ids)
-
-#     seq_lengths = [len(s) for s in tokenized_sentences]
-#     logger.info(f"MAX TOKENIZED SEQ LENGTH IN DATASET IS {max(seq_lengths)}")
-#     # PAD ALL SEQUENCES
-#     input_ids = pad_sequences(tokenized_sentences, maxlen=max_len, dtype="long", value=0, truncating="post", padding="post")
-#     if label_indices:
-#         label_ids = pad_sequences(label_indices, maxlen=max_len, dtype="long", value=pad_token_label_id, truncating="post", padding="post")
-#         label_ids = LongTensor(label_ids)
-#     else:
-#         label_ids = None
-#     # Create attention masks
-#     attention_masks = []
-#     # For each sentence...
-#     for i, sent in enumerate(input_ids):
-#         # Create the attention mask.
-#         #   - If a token ID is 0, then it's padding, set the mask to 0.
-#         #   - If a token ID is > 0, then it's a real token, set the mask to 1.
-#         att_mask = [int(token_id > 0) for token_id in sent]
-#         # Store the attention mask for this sentence.
-#         attention_masks.append(att_mask)
-#     print("Total fucked sentences:", len(problems))
-#     return LongTensor(input_ids), LongTensor(attention_masks), label_ids,  LongTensor(seq_lengths)
 
 
 def get_annotatated_sentence(rows: List, has_labels: bool) -> Tuple[List, List]:
@@ -237,13 +196,15 @@ def get_json(chunk, delimiter='\t'):
     
     for line in chunk:         
         tokens = line.split(delimiter)
-        sentence.append(tokens[1])
-        if len(tokens)>= 11 and tokens[10] != '_':
-            predicate_senses[pred_index]["pred_sense"] = [int(float(tokens[0])) -1, tokens[10]]
-            pred_index += 1
-        preds = tokens[11:]
-        for i, pred in enumerate(preds):
-            predicate_senses[i]['bio'].append(pred)
+
+        if "." not in tokens[0]:
+            sentence.append(tokens[1])
+            if len(tokens)>= 11 and tokens[10] != '_':
+                predicate_senses[pred_index]["pred_sense"] = [int(float(tokens[0])) -1, tokens[10]]
+                pred_index += 1
+            preds = tokens[11:]
+            for i, pred in enumerate(preds):
+                predicate_senses[i]['bio'].append(pred)
     for i in range(len(predicate_senses)):
         predicate_senses[i]["seq_words"] = sentence
         
@@ -309,7 +270,7 @@ def evaluate_bert_model(eval_dataloader: DataLoader, eval_batch_size: int, model
             preds = np.append(preds, logits.detach().cpu().numpy(), axis=0)
             gold_label_ids = np.append(gold_label_ids, b_labels.detach().cpu().numpy(), axis=0)
             input_ids = np.append(input_ids, b_input_ids.detach().cpu().numpy(), axis=0)
-
+    print(eval_loss, nb_eval_steps)
     eval_loss = eval_loss / nb_eval_steps
     preds = np.argmax(preds, axis=2)
 
@@ -392,6 +353,19 @@ def load_model(model_class, tokenizer_class, model_dir):
     model.to(device)
     return model, tokenizer
 
+def plot_loss(loss_values):
+    x_values = range(1, len(loss_values) + 1)
+
+    # plot the loss values
+    plt.plot(x_values, loss_values)
+
+    # add labels to the x-axis and y-axis
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+
+    # add a title to the plot
+    plt.title("Training Loss over Epochs")
+    plt.savefig("loss.png")
 
 ##### Misc Functions ##### 
 

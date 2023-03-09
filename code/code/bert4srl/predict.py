@@ -17,7 +17,7 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import SequentialSampler
 import warnings
 warnings.filterwarnings("ignore")
-def predictions(batchsize):
+def predictions(batchsize, epoch):
     GPU_IX=0
     _, USE_CUDA = util.get_torch_device(GPU_IX)
     FILE_HAS_GOLD = True
@@ -27,7 +27,7 @@ def predictions(batchsize):
     TEST_DATA_PATH = "data\en_ewt-up-test.conllu" # "data/conll2003.dev.conll"
     # TEST_DATA_PATH = "data/trial_unk_data.conll"
     MODEL_DIR = "saved_models/MY_BERT_NER/"
-    LOAD_EPOCH = 1
+    LOAD_EPOCH = epoch
     INPUTS_PATH=f"{MODEL_DIR}/EPOCH_{LOAD_EPOCH}/model_inputs.txt"
     OUTPUTS_PATH=f"{MODEL_DIR}/EPOCH_{LOAD_EPOCH}/model_outputs.txt"
     PAD_TOKEN_LABEL_ID = CrossEntropyLoss().ignore_index # -100
@@ -39,12 +39,12 @@ def predictions(batchsize):
     # prediction_inputs, prediction_masks, gold_labels = read_two(TESTFILE)
 
 
-    X_test, y_test, labelindex, _, _ = util.read_json_srl(TESTFILE)
+    X_test, y_test, labelindex, _, _ = util.read_json_srl(TEST_DATA_PATH)
     test_inputs, test_masks, test_predicate_labels, test_labels, seq_lengths = util.data_to_tensors(X_test, 
                                                                                                 tokenizer, 
                                                                                                 max_len=SEQ_MAX_LEN, 
                                                                                                 labels=y_test, 
-                                                                                                label2index=labelindex,
+                                                                                                label2index=label2index,
                                                                                                 pad_token_label_id=PAD_TOKEN_LABEL_ID)
 
     # Create the DataLoader for our training set.
@@ -52,9 +52,9 @@ def predictions(batchsize):
     test_sampler = RandomSampler(test_data)
     prediction_dataloader = DataLoader(test_data, sampler=test_sampler, batch_size=BATCH_SIZE)
 
-    print('Predicting labels for {:,} test sentences...'.format(len(prediction_inputs)))
+    print('Predicting labels for {:,} test sentences...'.format(len(test_inputs)))
     
-    results, preds_list = util.evaluate_bert_model(prediction_dataloader, BATCH_SIZE, model, tokenizer, index2label, 
+    results, preds_list = util.evaluate_bert_model(prediction_dataloader, BATCH_SIZE, model, tokenizer, label2index, 
                                                         PAD_TOKEN_LABEL_ID, full_report=True, prefix="Test Set")
     print("  Test Loss: {0:.2f}".format(results['loss']))
     print("  Precision: {0:.2f} || Recall: {1:.2f} || F1: {2:.2f}".format(results['precision']*100, results['recall']*100, results['f1']*100))
