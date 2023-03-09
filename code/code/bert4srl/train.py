@@ -15,10 +15,11 @@ from transformers import pipeline
 from predict import predictions
 from sklearn.model_selection import train_test_split
 from torch.utils.data import SequentialSampler
+import argparse
 import warnings
 import matplotlib.pyplot as plt
-
 warnings.filterwarnings("ignore")
+
 
 PAD_TOKEN_LABEL_ID = CrossEntropyLoss().ignore_index # -100
 torch.backends.cuda.max_split_size_bytes = 64 * 1024 * 1024
@@ -43,10 +44,25 @@ LABELS_FILENAME = f"{SAVE_MODEL_DIR}/label2index.json"
 LOSS_TRN_FILENAME = f"{SAVE_MODEL_DIR}/Losses_Train_{EPOCHS}.json"
 LOSS_DEV_FILENAME = f"{SAVE_MODEL_DIR}/Losses_Dev_{EPOCHS}.json"
 
-
+def argparse():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-trainpath', '--train_path', help='Path to Train set', default="data\en_ewt-up-train.conllu")
+    parser.add_argument('-devpath', '--dev_path', help='Path to Dev Set', default="data\en_ewt-up-test.conllu")
+    parser.add_argument('-epochs', '--epochs', type=int, default=4)
+    parser.add_argument('-batchsize', '--batch_size', type=int, default=8)
+    parser.add_argument('-maxlen', '--max_len', type=int, default=256)
+    args = parser.parse_args()
+    return args
 
 # function that reads the util code
 if __name__ == "__main__":
+    args = argparse()
+    SEQ_MAX_LEN = args.max_len
+    BATCH_SIZE = args.batch_size
+    EPOCHS = args.epochs
+    TRAINFILE = args.train_path
+    TESTFILE = args.dev_path
+
     tokenizer = BertTokenizer.from_pretrained(BERT_MODEL_NAME, do_basic_tokenize=False)
     
 
