@@ -46,7 +46,7 @@ def wordpieces_to_tokens(wordpieces: List, labelpieces: List = None) -> Tuple[Li
     return full_words, full_labels
 
 
-def expand_to_wordpieces(original_sentence: List, tokenizer: BertTokenizer, original_labels: List=None) -> Tuple[List, List]:
+def expand_to_wordpieces(original_sentence: List, tokenizer: BertTokenizer, original_labels, predicate_index) -> Tuple[List, List]:
     """
     Also Expands BIO, but assigns the original label ONLY to the Head of the WordPiece (First WP)
     :param original_sentence: List of Full-Words
@@ -56,7 +56,22 @@ def expand_to_wordpieces(original_sentence: List, tokenizer: BertTokenizer, orig
     """
     txt_sentence = " ".join(original_sentence)
     txt_sentence = txt_sentence.replace("##", "")
-    word_pieces = tokenizer.tokenize(txt_sentence)
+    predicate_list = [0]
+    tokenized_list = []
+    for i, el in enumerate(original_sentence):
+
+        tokenized = (tokenizer.tokenize(el))
+        if i == predicate_index:
+            for _ in range(len(tokenized)):
+                predicate_list.append(1)
+        else:
+            for _ in range(len(tokenized)):
+                predicate_list.append(0)
+
+        tokenized_list.extend(tokenized)
+    predicate_list.append(0)
+
+    word_pieces = tokenized_list
 
     if original_labels:
         tmp_labels, lbl_ix = [], 0
@@ -71,9 +86,10 @@ def expand_to_wordpieces(original_sentence: List, tokenizer: BertTokenizer, orig
 
         word_pieces = ["[CLS]"] + word_pieces + ["[SEP]"]
         labels = ["X"] + tmp_labels + ["X"]
-        return word_pieces, labels
+
+        return word_pieces, labels, predicate_list
     else:
-        return word_pieces, []
+        return word_pieces, [], predicate_list
 
 # With predicate labels
 def data_to_tensors(dataset: List, tokenizer: BertTokenizer, max_len: int, labels: List=None, label2index: Dict=None, pad_token_label_id: int=-100) -> Tuple:
@@ -81,9 +97,10 @@ def data_to_tensors(dataset: List, tokenizer: BertTokenizer, max_len: int, label
     problems = set()
     for i, sentence in enumerate(dataset):
         # Get WordPiece Indices
+        predicate_index = labels[i].index("V")
         if labels and label2index:
             try:
-                wordpieces, labelset = expand_to_wordpieces(sentence, tokenizer, labels[i])
+                wordpieces, labelset, predicate_list = expand_to_wordpieces(sentence, tokenizer, labels[i], predicate_index)
             except Exception as e:
                 if tuple(sentence) not in problems:
                     print("Problem expanding: ", " ".join(sentence))
@@ -96,11 +113,9 @@ def data_to_tensors(dataset: List, tokenizer: BertTokenizer, max_len: int, label
         else:
              wordpieces, labelset = expand_to_wordpieces(sentence, tokenizer, None)
              predicate_index = [0] * len(sentence)
-        sentence_labels = labels[i]
-        predicate_index = [1 if element in sentence_labels == "V" else 0 for element in sentence_labels]     
         input_ids = tokenizer.convert_tokens_to_ids(wordpieces)
+        predicate_indices.append(predicate_list)
         tokenized_sentences.append(input_ids)
-        predicate_indices.append(predicate_index)
 
     seq_lengths = [len(s) for s in tokenized_sentences]
     logger.info(f"MAX TOKENIZED SEQ LENGTH IN DATASET IS {max(seq_lengths)}")
@@ -318,9 +333,7 @@ def evaluate_bert_model(eval_dataloader: DataLoader, eval_batch_size: int, model
             full_word_preds.append((full_words, full_preds))
             print(f"\n----- {seq_ix+1} -----\n{full_words}\n\nGOLD: {full_gold}\nPRED:{full_preds}\n")
            
-    print(gold_label_list[10])
-    print(np.asarray(gold_label_list[10]) == np.asarray(pred_label_list[10]))
-    print(pred_label_list[10])
+
     results = {
         "loss": eval_loss,
         "precision": precision_score(gold_label_list, pred_label_list),
