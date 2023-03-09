@@ -112,9 +112,9 @@ def preprocess_data_for_bert(all_sentences, labels, label_dict, all_preds, max_l
                     tokenized_label.append(label_dict["_"])
             else:
                 try:
-                    tokenized_label.extend([label_dict[labels[i][j]]] * len(tokenized_word))
+                    tokenized_label.extend([label_dict[labels[i][j]]])
                 except:
-                    tokenized_label.extend([label_dict["_"]*len(tokenized_word)])
+                    tokenized_label.extend([label_dict["_"]])
 
         # make sure the length of the sentence is not longer than the max length trhough padding
 
