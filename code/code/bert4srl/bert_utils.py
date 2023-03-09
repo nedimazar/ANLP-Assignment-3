@@ -258,24 +258,26 @@ def evaluate_bert_model(eval_dataloader: DataLoader, eval_batch_size: int, model
                 pred_label_list[seq_ix].append(label_map[preds[seq_ix][j]])
 
 
-        if full_report:
+        if True:
             wordpieces = tokenizer.convert_ids_to_tokens(input_ids[seq_ix], skip_special_tokens=True) 
             full_words, _ = wordpieces_to_tokens(wordpieces, labelpieces=None)
             full_preds = pred_label_list[seq_ix]
             full_gold = gold_label_list[seq_ix]
             full_word_preds.append((full_words, full_preds))
-            logger.info(f"\n----- {seq_ix+1} -----\n{full_words}\n\nGOLD: {full_gold}\nPRED:{full_preds}\n")
+            print(f"\n----- {seq_ix+1} -----\n{full_words}\n\nGOLD: {full_gold}\nPRED:{full_preds}\n")
            
-
+    print(gold_label_list[10])
+    print(np.asarray(gold_label_list[10]) == np.asarray(pred_label_list[10]))
+    print(pred_label_list[10])
     results = {
         "loss": eval_loss,
-        "precision": precision_score(gold_label_list, pred_label_list),
+        "precision": precision_score(gold_label_list[10], pred_label_list[10]),
         "recall": recall_score(gold_label_list, pred_label_list),
         "f1": f1_score(gold_label_list, pred_label_list),
     }
 
-    if full_report:
-        logger.info("\n\n"+classification_report(gold_label_list, pred_label_list))
+    if True:
+        print("\n\n"+classification_report(gold_label_list[10], pred_label_list[10]))
     return results, full_word_preds
 
 

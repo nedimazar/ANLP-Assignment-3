@@ -13,6 +13,8 @@ import torch
 from torch.nn import CrossEntropyLoss
 from transformers import pipeline
 from torch.utils.data import SequentialSampler
+import warnings
+warnings.filterwarnings("ignore")
 
 PAD_TOKEN_LABEL_ID = CrossEntropyLoss().ignore_index # -100
 torch.backends.cuda.max_split_size_bytes = 64 * 1024 * 1024
@@ -155,7 +157,7 @@ def get_data(file_name):
 
     all_sentences, labels, label_dict, all_preds, _ = util.read_json_srl(file_name)
     
-    input_features = preprocess_data_for_bert(all_sentences, labels, label_dict, all_preds, max_length = SEQLENGTH)
+    input_features = preprocess_data_for_bert(all_sentences[:100], labels[:100], label_dict, all_preds[:100], max_length = SEQLENGTH)
     
     return input_features,label_dict
 
