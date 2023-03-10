@@ -11,7 +11,7 @@ from seqeval.metrics import f1_score, precision_score, recall_score, classificat
 from transformers.utils.dummy_pt_objects import BertModel
 from transformers import get_linear_schedule_with_warmup
 import warnings
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 warnings.filterwarnings("ignore")
 
 logger = logging.getLogger(__name__)
@@ -347,19 +347,19 @@ def load_model(model_class, tokenizer_class, model_dir):
     model.to(device)
     return model, tokenizer
 
-def plot_loss(loss_values, filename = "loss.png"):
-    x_values = range(1, len(loss_values) + 1)
+# def plot_loss(loss_values, filename = "loss.png"):
+#     x_values = range(1, len(loss_values) + 1)
 
-    # plot the loss values
-    plt.plot(x_values, loss_values)
+#     # plot the loss values
+#     plt.plot(x_values, loss_values)
 
-    # add labels to the x-axis and y-axis
-    plt.xlabel("Epoch")
-    plt.ylabel("Loss")
+#     # add labels to the x-axis and y-axis
+#     plt.xlabel("Epoch")
+#     plt.ylabel("Loss")
 
-    # add a title to the plot
-    plt.title("Training Loss over Epochs")
-    plt.savefig(filename)
+#     # add a title to the plot
+#     plt.title("Training Loss over Epochs")
+#     plt.savefig(filename)
 
 ##### Misc Functions ##### 
 

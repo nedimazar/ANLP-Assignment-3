@@ -6,6 +6,7 @@ This code defines a BERT-based named entity recognition (NER) model using the tr
 
 
 ### Usage
+`Python version: 3.8`
 To run this code, first, install the required packages listed in the requirements.txt file. Then, you can train and evaluate the NER model by running the train.py script. To see the available options for the train.py script, you can run python train.py --help.
 
 The code assumes that the input data is in the CoNLL-U format. The read_json_srl() function in the bert_utils.py file is used to parse the CoNLL-U formatted data.
@@ -35,4 +36,6 @@ This file defines a function for making predictions on new data using the traine
 requirements.txt
 This file lists the required packages and their versions for running the code.
 
+### Note
+We had some problems fixing dependency issues regarding `matplotlib`, so we commented out the lines that generate plots in the various scripts. Feel free to install `matplotlib` and try running them.
 

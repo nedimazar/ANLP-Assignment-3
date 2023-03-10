@@ -18,7 +18,7 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import SequentialSampler
 import argparse
 import warnings
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 warnings.filterwarnings("ignore")
 
 import os
@@ -189,7 +189,7 @@ if __name__ == "__main__":
         print("  Validation took: {:}".format(util.format_time(time.time() - t0)))
         util.save_model(f"{SAVE_MODEL_DIR}/EPOCH_{epoch_i}", {"args":[]}, model, tokenizer)
 
-        util.plot_loss(epochplot, filename=f"{SAVE_MODEL_DIR}/EPOCH_{epoch_i}_loss.png")
+        # util.plot_loss(epochplot, filename=f"{SAVE_MODEL_DIR}/EPOCH_{epoch_i}_loss.png")
         # Save Checkpoint for this Epoch
 
         # util.save_model(f"{SAVE_MODEL_DIR}/EPOCH_{epoch_i}", {"args":[]}, model, tokenizer)
@@ -200,7 +200,7 @@ if __name__ == "__main__":
     file.write(str(loss_list))
     file.close()
     
-    util.plot_loss(loss_list)
+    # util.plot_loss(loss_list)
     util.save_losses(loss_trn_values, filename=LOSS_TRN_FILENAME)
     util.save_losses(loss_dev_values, filename=LOSS_DEV_FILENAME)
     print("")
