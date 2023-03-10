@@ -74,7 +74,7 @@ if __name__ == "__main__":
     LOSS_DEV_FILENAME = f"{SAVE_MODEL_DIR}/Losses_Dev_{EPOCHS}.json"
     # Load the training data With Predicate labels
     data, label, labelindex, _, _ = util.read_json_srl(TRAINFILE)
-    X_train, X_test, y_train, y_test = train_test_split(data[:100], label[:100], test_size=0.1, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(data, label, test_size=0.1, random_state=42)
     train_inputs, train_masks, train_predicate_labels, train_labels, seq_lengths = util.data_to_tensors(X_train, 
                                                                                                 tokenizer, 
                                                                                                 max_len=SEQ_MAX_LEN, 

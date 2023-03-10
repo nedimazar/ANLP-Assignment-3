@@ -39,10 +39,10 @@ def predictions():
 
     data, label, labelindex, _, _ = util.read_json_srl(TEST_DATA_PATH)
 
-    prediction_inputs, prediction_mask, prediction_predicate_labels, prediction_labels, prediction_seq_lengths = util.data_to_tensors(data[:10], 
+    prediction_inputs, prediction_mask, prediction_predicate_labels, prediction_labels, prediction_seq_lengths = util.data_to_tensors(data, 
                                                                                                     tokenizer, 
                                                                                                     max_len=SEQ_MAX_LEN, 
-                                                                                                    labels=label[:10], 
+                                                                                                    labels=label, 
                                                                                                     label2index=label2index,
                                                                                                     pad_token_label_id=PAD_TOKEN_LABEL_ID)
 
