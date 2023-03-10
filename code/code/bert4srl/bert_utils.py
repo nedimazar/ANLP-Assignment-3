@@ -95,6 +95,7 @@ def expand_to_wordpieces(original_sentence: List, tokenizer: BertTokenizer, orig
 # With predicate labels
 def data_to_tensors(dataset: List, tokenizer: BertTokenizer, max_len: int, labels: List=None, label2index: Dict=None, pad_token_label_id: int=-100) -> Tuple:
     tokenized_sentences, label_indices, predicate_indices = [], [], []
+    # exit()
     problems = set()
     for i, sentence in enumerate(dataset):
         # Get WordPiece Indices
@@ -103,6 +104,7 @@ def data_to_tensors(dataset: List, tokenizer: BertTokenizer, max_len: int, label
         if labels and label2index:
             try:
                 wordpieces, labelset, predicate_list = expand_to_wordpieces(sentence, tokenizer, labels[i], predicate_index)
+                print(labelset)
             except Exception as e:
                 if tuple(sentence) not in problems:
                     print("Problem expanding: ", " ".join(sentence))
@@ -110,7 +112,9 @@ def data_to_tensors(dataset: List, tokenizer: BertTokenizer, max_len: int, label
                 continue
 
             # Extract predicates and predicate indices
-            label_indices.append([label2index.get(lbl, pad_token_label_id) for lbl in labelset])
+            label_indices.append([label2index.get(lbl, 0) for lbl in labelset])
+            print(label_indices)
+
         else:
              wordpieces, labelset = expand_to_wordpieces(sentence, tokenizer, None)
              predicate_index = [0] * len(sentence)
@@ -279,7 +283,8 @@ def evaluate_bert_model(eval_dataloader: DataLoader, eval_batch_size: int, model
     full_word_preds = []
     label_map = {value: key for key, value in label_map.items()}
     # exit()
-
+    print("label map", label_map, "Goldlabel_ids", gold_label_ids[2])
+    print("")
     print(label_map, gold_label_ids[2], pred_label_list[2], gold_label_list[2])
     for seq_ix in range(gold_label_ids.shape[0]):
         for j in range(gold_label_ids.shape[1]):

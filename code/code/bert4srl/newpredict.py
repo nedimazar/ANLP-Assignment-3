@@ -32,9 +32,9 @@ def predictions():
                                                                                                     tokenizer, 
                                                                                                     max_len=SEQ_MAX_LEN, 
                                                                                                     labels=label[:50], 
-                                                                                                    label2index=labelindex,
+                                                                                                    label2index=index2label,
                                                                                                     pad_token_label_id=PAD_TOKEN_LABEL_ID)
-    print(prediction_labels[1])
+    # print(prediction_labels[1])
     prediction_data = TensorDataset(prediction_inputs, prediction_mask, prediction_labels, prediction_predicate_labels)
     prediction_sampler = RandomSampler(prediction_data)
     prediction_dataloader = DataLoader(prediction_data, sampler=prediction_sampler, batch_size=BATCH_SIZE)
