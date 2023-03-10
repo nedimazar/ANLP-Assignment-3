@@ -33,7 +33,7 @@ def predictions():
 
 
     model, tokenizer = util.load_model(BertForTokenClassification, BertTokenizer, f"{MODEL_DIR}/EPOCH_{LOAD_EPOCH}")
-    index2label = util.load_label_dict(f"{MODEL_DIR}/label2index.json")
+    index2label = util.load_label_dict(f"label2index.json")
     label2index = {v:k for k,v in index2label.items()}
     seq_lens = len(label2index)
 
