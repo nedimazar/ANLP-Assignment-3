@@ -10,8 +10,9 @@ import logging, re
 from seqeval.metrics import f1_score, precision_score, recall_score, classification_report
 from transformers.utils.dummy_pt_objects import BertModel
 from transformers import get_linear_schedule_with_warmup
+import warnings
 import matplotlib.pyplot as plt
-
+warnings.filterwarnings("ignore")
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +96,6 @@ def expand_to_wordpieces(original_sentence: List, tokenizer: BertTokenizer, orig
 # With predicate labels
 def data_to_tensors(dataset: List, tokenizer: BertTokenizer, max_len: int, labels: List=None, label2index: Dict=None, pad_token_label_id: int=-100) -> Tuple:
     tokenized_sentences, label_indices, predicate_indices = [], [], []
-    # exit()
     problems = set()
     for i, sentence in enumerate(dataset):
         # Get WordPiece Indices
@@ -110,7 +110,6 @@ def data_to_tensors(dataset: List, tokenizer: BertTokenizer, max_len: int, label
                     problems.add(tuple(sentence))
                 continue
 
-            # Extract predicates and predicate indices
             label_indices.append([label2index.get(lbl, 0) for lbl in labelset])
         else:
              wordpieces, labelset = expand_to_wordpieces(sentence, tokenizer, None)
@@ -140,11 +139,7 @@ def data_to_tensors(dataset: List, tokenizer: BertTokenizer, max_len: int, label
         att_mask = [int(token_id > 0) for token_id in sent]
         # Store the attention mask for this sentence.
         attention_masks.append(att_mask)
-    # print("Total fucked sentences:", len(problems))
     return LongTensor(input_ids), LongTensor(attention_masks), LongTensor(predicate_ids), label_ids, LongTensor(seq_lengths)
-
-
-
 
 def get_annotatated_sentence(rows: List, has_labels: bool) -> Tuple[List, List]:
     x, y = [], []
@@ -278,21 +273,17 @@ def evaluate_bert_model(eval_dataloader: DataLoader, eval_batch_size: int, model
     gold_label_list = [[] for _ in range(gold_label_ids.shape[0])]
     pred_label_list = [[] for _ in range(gold_label_ids.shape[0])]
     full_word_preds = []
-    label_map = {value: key for key, value in label_map.items()}
+    label_map = {int(value): key for key, value in label_map.items()}
     # exit()
-    print("label map", label_map, "Goldlabel_ids", gold_label_ids)
-    print("")
+    # print("label map", label_map, "Goldlabel_ids", gold_label_ids)
+    # print("")
     # print(label_map, gold_label_ids[2], pred_label_list[2], gold_label_list[2])
     for seq_ix in range(gold_label_ids.shape[0]):
         for j in range(gold_label_ids.shape[1]):
             if gold_label_ids[seq_ix, j] != pad_token_label_id:
-                try:
-                    gold_label_list[seq_ix].append(label_map[gold_label_ids[seq_ix][j]])
-                    pred_label_list[seq_ix].append(label_map[preds[seq_ix][j]])
-                    print("i`")
-                except:
-                    print("Error in seq_ix", seq_ix, "j", j, "gold_label_ids", gold_label_ids[seq_ix][j], "preds", preds[seq_ix][j])
-
+                # try:
+                gold_label_list[seq_ix].append(label_map[gold_label_ids[seq_ix][j]])
+                pred_label_list[seq_ix].append(label_map[preds[seq_ix][j]])
         if full_report:
             wordpieces = tokenizer.convert_ids_to_tokens(input_ids[seq_ix], skip_special_tokens=True) 
             full_words, _ = wordpieces_to_tokens(wordpieces, labelpieces=None)
@@ -300,7 +291,7 @@ def evaluate_bert_model(eval_dataloader: DataLoader, eval_batch_size: int, model
             full_gold = gold_label_list[seq_ix]
             full_word_preds.append((full_words, full_preds))
             print(f"\n----- {seq_ix+1} -----\n{full_words}\n\nGOLD: {full_gold}\nPRED:{full_preds}\n")
-           
+
     results = {
         "loss": eval_loss,
         "precision": precision_score(gold_label_list, pred_label_list),

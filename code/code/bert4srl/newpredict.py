@@ -2,7 +2,7 @@ import bert_utils as util
 from torch.nn import CrossEntropyLoss
 from transformers import BertForTokenClassification, BertTokenizer
 from torch.utils.data import TensorDataset, DataLoader, RandomSampler, Dataset
-
+import numpy as np
 
 def predictions():
     GPU_IX=0
@@ -22,19 +22,19 @@ def predictions():
 
 
     model, tokenizer = util.load_model(BertForTokenClassification, BertTokenizer, f"{MODEL_DIR}/EPOCH_{LOAD_EPOCH}")
-    label2index = util.load_label_dict(f"{MODEL_DIR}/label2index.json")
-    index2label = {v:k for k,v in label2index.items()}
+    index2label = util.load_label_dict(f"{MODEL_DIR}/label2index.json")
+    label2index = {v:k for k,v in index2label.items()}
     seq_lens = len(label2index)
-    # prediction_inputs, prediction_masks, gold_labels = read_two(TESTFILE)
 
     data, label, labelindex, _, _ = util.read_json_srl(TEST_DATA_PATH)
-    prediction_inputs, prediction_mask, prediction_predicate_labels, prediction_labels, prediction_seq_lengths = util.data_to_tensors(data[:50], 
+
+    prediction_inputs, prediction_mask, prediction_predicate_labels, prediction_labels, prediction_seq_lengths = util.data_to_tensors(data, 
                                                                                                     tokenizer, 
                                                                                                     max_len=SEQ_MAX_LEN, 
-                                                                                                    labels=label[:50], 
-                                                                                                    label2index=index2label,
+                                                                                                    labels=label, 
+                                                                                                    label2index=label2index,
                                                                                                     pad_token_label_id=PAD_TOKEN_LABEL_ID)
-    # print(prediction_labels[1])
+
     prediction_data = TensorDataset(prediction_inputs, prediction_mask, prediction_labels, prediction_predicate_labels)
     prediction_sampler = RandomSampler(prediction_data)
     prediction_dataloader = DataLoader(prediction_data, sampler=prediction_sampler, batch_size=BATCH_SIZE)
@@ -42,8 +42,9 @@ def predictions():
 
 
     print('Predicting labels for {:,} test sentences...'.format(len(prediction_inputs)))
-    
-    results, preds_list = util.evaluate_bert_model(prediction_dataloader, BATCH_SIZE, model, tokenizer, index2label, 
+    print("oindex", index2label, "label", label2index)
+    # exit()
+    results, preds_list = util.evaluate_bert_model(prediction_dataloader, BATCH_SIZE, model, tokenizer, label2index, 
                                                         PAD_TOKEN_LABEL_ID, full_report=True, prefix="Test Set")
     print("  Test Loss: {0:.2f}".format(results['loss']))
     print("  Precision: {0:.2f} || Recall: {1:.2f} || F1: {2:.2f}".format(results['precision']*100, results['recall']*100, results['f1']*100))
