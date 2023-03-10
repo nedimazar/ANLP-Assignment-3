@@ -20,11 +20,11 @@ import warnings
 import matplotlib.pyplot as plt
 warnings.filterwarnings("ignore")
 
-
+import os
 PAD_TOKEN_LABEL_ID = CrossEntropyLoss().ignore_index # -100
 torch.backends.cuda.max_split_size_bytes = 64 * 1024 * 1024
 BERT_MODEL_NAME = 'bert-base-multilingual-cased'
-SAVE_MODEL_DIR = "saved_models/MY_BERT_NER"
+# SAVE_MODEL_DIR = "saved_models/MY_BERT_NER"
 TESTFILE = "data\en_ewt-up-test.conllu"
 TRAINFILE = "data\en_ewt-up-train.conllu"
 EPOCHS = 10
@@ -38,18 +38,17 @@ device, USE_CUDA = util.get_torch_device(GPU_IX)
 
 PRINT_INFO_EVERY = 10 # Print status only every X batches
 GRADIENT_CLIP = 1.0
-LEARNING_RATE = 1e-4
+LEARNING_RATE = 1e-5
 BATCH_SIZE = 16
-LABELS_FILENAME = f"{SAVE_MODEL_DIR}/label2index.json"
-LOSS_TRN_FILENAME = f"{SAVE_MODEL_DIR}/Losses_Train_{EPOCHS}.json"
-LOSS_DEV_FILENAME = f"{SAVE_MODEL_DIR}/Losses_Dev_{EPOCHS}.json"
+
 
 def args_function():
     parser = argparse.ArgumentParser()
     parser.add_argument('-trainpath', '--train_path', help='Path to Train set', default="data\en_ewt-up-train.conllu")
     parser.add_argument('-devpath', '--dev_path', help='Path to Dev Set', default="data\en_ewt-up-test.conllu")
-    parser.add_argument('-epochs', '--epochs', type=int, default=4)
-    parser.add_argument('-batchsize', '--batch_size', type=int, default=8)
+    parser.add_argument('-epochs', '--epochs', type=int, default=12)
+    parser.add_argument('-batchsize', '--batch_size', type=int, default=32)
+    parser.add_argument('-learningrate', '--learning_rate', type=float, default=1e-5)
     parser.add_argument('-maxlen', '--max_len', type=int, default=256)
     args = parser.parse_args()
     return args
@@ -62,13 +61,16 @@ if __name__ == "__main__":
     EPOCHS = args.epochs
     TRAINFILE = args.train_path
     TESTFILE = args.dev_path
-
+    LEARNING_RATE = args.learning_rate
+    SAVE_MODEL_DIR =f"saved_models/BERT_SRL_{args.max_len}_{args.batch_size}_{args.epochs}_{args.learning_rate}"
     tokenizer = BertTokenizer.from_pretrained(BERT_MODEL_NAME, do_basic_tokenize=False)
-    
-
+    os.makedirs(SAVE_MODEL_DIR)
+    LABELS_FILENAME = f"{SAVE_MODEL_DIR}/label2index.json"
+    LOSS_TRN_FILENAME = f"{SAVE_MODEL_DIR}/Losses_Train_{EPOCHS}.json"
+    LOSS_DEV_FILENAME = f"{SAVE_MODEL_DIR}/Losses_Dev_{EPOCHS}.json"
     # Load the training data With Predicate labels
     data, label, labelindex, _, _ = util.read_json_srl(TRAINFILE)
-    X_train, X_test, y_train, y_test = train_test_split(data, label, test_size=0.2, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(data[:], label[:], test_size=0.1, random_state=42)
     train_inputs, train_masks, train_predicate_labels, train_labels, seq_lengths = util.data_to_tensors(X_train, 
                                                                                                 tokenizer, 
                                                                                                 max_len=SEQ_MAX_LEN, 
@@ -93,6 +95,7 @@ if __name__ == "__main__":
     dev_data = TensorDataset(dev_inputs, dev_masks, dev_labels, dev_predicate_labels)
     dev_sampler = RandomSampler(dev_data)
     dev_dataloader = DataLoader(dev_data, sampler=dev_sampler, batch_size=BATCH_SIZE)
+
 
     labelindextemp = {value: key for key, value in labelindex.items()}
     loss_list = []
@@ -174,18 +177,25 @@ if __name__ == "__main__":
         # ========================================
         # After the completion of each training epoch, measure our performance on our validation set.
         t0 = time.time()
+
         results, preds_list = util.evaluate_bert_model(dev_dataloader, BATCH_SIZE, model, tokenizer, labelindex, PAD_TOKEN_LABEL_ID, prefix="Validation Set")
         loss_dev_values.append(results['loss'])
         print("  Validation Loss: {0:.2f}".format(results['loss']))
         print("  Precision: {0:.2f} || Recall: {1:.2f} || F1: {2:.2f}".format(results['precision']*100, results['recall']*100, results['f1']*100))
         print("  Validation took: {:}".format(util.format_time(time.time() - t0)))
+        util.save_model(f"{SAVE_MODEL_DIR}/EPOCH_{epoch_i}", {"args":[]}, model, tokenizer)
 
         util.plot_loss(epochplot, filename=f"{SAVE_MODEL_DIR}/EPOCH_{epoch_i}_loss.png")
         # Save Checkpoint for this Epoch
 
-        util.save_model(f"{SAVE_MODEL_DIR}/EPOCH_{epoch_i}", {"args":[]}, model, tokenizer)
+        # util.save_model(f"{SAVE_MODEL_DIR}/EPOCH_{epoch_i}", {"args":[]}, model, tokenizer)
 
     ## Use matplotlip to plot the loss curve
+    # save los as in text file
+    file = open(f"{SAVE_MODEL_DIR}/loss.txt", "w")
+    file.write(str(loss_list))
+    file.close()
+    
     print(loss_list)
     util.plot_loss(loss_list)
     util.save_losses(loss_trn_values, filename=LOSS_TRN_FILENAME)

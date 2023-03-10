@@ -99,6 +99,7 @@ def data_to_tensors(dataset: List, tokenizer: BertTokenizer, max_len: int, label
     for i, sentence in enumerate(dataset):
         # Get WordPiece Indices
         predicate_index = labels[i].index("V")
+        # exit()
         if labels and label2index:
             try:
                 wordpieces, labelset, predicate_list = expand_to_wordpieces(sentence, tokenizer, labels[i], predicate_index)
@@ -109,7 +110,6 @@ def data_to_tensors(dataset: List, tokenizer: BertTokenizer, max_len: int, label
                 continue
 
             # Extract predicates and predicate indices
-
             label_indices.append([label2index.get(lbl, pad_token_label_id) for lbl in labelset])
         else:
              wordpieces, labelset = expand_to_wordpieces(sentence, tokenizer, None)
@@ -123,6 +123,7 @@ def data_to_tensors(dataset: List, tokenizer: BertTokenizer, max_len: int, label
     # PAD ALL SEQUENCES
     input_ids = pad_sequences(tokenized_sentences, maxlen=max_len, dtype="long", value=0, truncating="post", padding="post")
     predicate_ids = pad_sequences(predicate_indices, maxlen=max_len, dtype="long", value=0, truncating="post", padding="post")
+
     if label_indices:
         label_ids = pad_sequences(label_indices, maxlen=max_len, dtype="long", value=pad_token_label_id, truncating="post", padding="post")
         label_ids = LongTensor(label_ids)
@@ -270,7 +271,6 @@ def evaluate_bert_model(eval_dataloader: DataLoader, eval_batch_size: int, model
             preds = np.append(preds, logits.detach().cpu().numpy(), axis=0)
             gold_label_ids = np.append(gold_label_ids, b_labels.detach().cpu().numpy(), axis=0)
             input_ids = np.append(input_ids, b_input_ids.detach().cpu().numpy(), axis=0)
-    print(eval_loss, nb_eval_steps)
     eval_loss = eval_loss / nb_eval_steps
     preds = np.argmax(preds, axis=2)
 
@@ -278,7 +278,9 @@ def evaluate_bert_model(eval_dataloader: DataLoader, eval_batch_size: int, model
     pred_label_list = [[] for _ in range(gold_label_ids.shape[0])]
     full_word_preds = []
     label_map = {value: key for key, value in label_map.items()}
+    # exit()
 
+    print(label_map, gold_label_ids[2], pred_label_list[2], gold_label_list[2])
     for seq_ix in range(gold_label_ids.shape[0]):
         for j in range(gold_label_ids.shape[1]):
             if gold_label_ids[seq_ix, j] != pad_token_label_id:
@@ -294,7 +296,6 @@ def evaluate_bert_model(eval_dataloader: DataLoader, eval_batch_size: int, model
             full_word_preds.append((full_words, full_preds))
             print(f"\n----- {seq_ix+1} -----\n{full_words}\n\nGOLD: {full_gold}\nPRED:{full_preds}\n")
            
-
     results = {
         "loss": eval_loss,
         "precision": precision_score(gold_label_list, pred_label_list),
@@ -303,7 +304,7 @@ def evaluate_bert_model(eval_dataloader: DataLoader, eval_batch_size: int, model
     }
 
     if full_report:
-        print("\n\n"+classification_report([gold_label_list[10]], [pred_label_list[10]]))
+        print("\n\n"+classification_report(gold_label_list, pred_label_list))
     return results, full_word_preds
 
 
