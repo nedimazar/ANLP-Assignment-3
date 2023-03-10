@@ -7,12 +7,13 @@ from transformers import BertForTokenClassification, AdamW
 from transformers import get_linear_schedule_with_warmup
 import logging, sys
 import time
+import random
 from transformers import BertTokenizer
 from tqdm import tqdm
 import torch
 from torch.nn import CrossEntropyLoss
 from transformers import pipeline
-from predict import predictions
+# from predict import predictions
 from sklearn.model_selection import train_test_split
 from torch.utils.data import SequentialSampler
 import argparse
@@ -64,13 +65,16 @@ if __name__ == "__main__":
     LEARNING_RATE = args.learning_rate
     SAVE_MODEL_DIR =f"saved_models/BERT_SRL_{args.max_len}_{args.batch_size}_{args.epochs}_{args.learning_rate}"
     tokenizer = BertTokenizer.from_pretrained(BERT_MODEL_NAME, do_basic_tokenize=False)
-    os.makedirs(SAVE_MODEL_DIR)
-    LABELS_FILENAME = f"{SAVE_MODEL_DIR}/label2index.json"
+    try:
+        os.makedirs(SAVE_MODEL_DIR)
+    except:
+        SAVE_MODEL_DIR += "_"+str(random.randint(0, 11000))
+    LABELS_FILENAME = f"label2index.json"
     LOSS_TRN_FILENAME = f"{SAVE_MODEL_DIR}/Losses_Train_{EPOCHS}.json"
     LOSS_DEV_FILENAME = f"{SAVE_MODEL_DIR}/Losses_Dev_{EPOCHS}.json"
     # Load the training data With Predicate labels
     data, label, labelindex, _, _ = util.read_json_srl(TRAINFILE)
-    X_train, X_test, y_train, y_test = train_test_split(data[:], label[:], test_size=0.1, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(data[:100], label[:100], test_size=0.1, random_state=42)
     train_inputs, train_masks, train_predicate_labels, train_labels, seq_lengths = util.data_to_tensors(X_train, 
                                                                                                 tokenizer, 
                                                                                                 max_len=SEQ_MAX_LEN, 
@@ -196,12 +200,9 @@ if __name__ == "__main__":
     file.write(str(loss_list))
     file.close()
     
-    print(loss_list)
     util.plot_loss(loss_list)
     util.save_losses(loss_trn_values, filename=LOSS_TRN_FILENAME)
     util.save_losses(loss_dev_values, filename=LOSS_DEV_FILENAME)
     print("")
     print("Training complete!")
 
-
-    predictions(BATCH_SIZE, EPOCHS)

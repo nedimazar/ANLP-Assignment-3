@@ -274,10 +274,7 @@ def evaluate_bert_model(eval_dataloader: DataLoader, eval_batch_size: int, model
     pred_label_list = [[] for _ in range(gold_label_ids.shape[0])]
     full_word_preds = []
     label_map = {int(value): key for key, value in label_map.items()}
-    # exit()
-    # print("label map", label_map, "Goldlabel_ids", gold_label_ids)
-    # print("")
-    # print(label_map, gold_label_ids[2], pred_label_list[2], gold_label_list[2])
+
     for seq_ix in range(gold_label_ids.shape[0]):
         for j in range(gold_label_ids.shape[1]):
             if gold_label_ids[seq_ix, j] != pad_token_label_id:
